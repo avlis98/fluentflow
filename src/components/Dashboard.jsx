@@ -12,12 +12,20 @@ import {
   Volume2,
   Lightbulb,
   Brain,
+  Share2,
+  Copy,
+  UserCheck,
+  X,
 } from 'lucide-react';
 import { LEVELS, INTERACTIVE_TEXTS, ROLEPLAY_SCENARIOS } from '../data/content';
 import { getSmartReviewQueue, calculateNextReview } from '../utils/srs';
 import { speakText, generateProgressiveHint } from '../utils/speech';
 
+const APP_SHARE_URL = 'https://avlis98.github.io/fluentflow/';
+
 export default function Dashboard({
+  userName,
+  onEditProfile,
   selectedLevel,
   onSelectLevel,
   onNavigate,
@@ -46,9 +54,40 @@ export default function Dashboard({
   // Estado da Micro-Revisão Diária Integrada (Item 2.B e 2.C)
   const [quickHintLevel, setQuickHintLevel] = useState(0);
   const [quickRevealed, setQuickRevealed] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   const urgentCard = smartQueue[0] || null;
   const progressPercent = Math.min(100, Math.round((xp / dailyGoal) * 100));
+
+  const shareMessage = `🚀 ${userName ? `${userName} está` : 'Estou'} praticando inglês no FluentFlow!\n🔥 Ofensiva: ${streak} dias seguidos\n🏆 XP Acumulado: ${xp} XP\n🧠 Blocos de linguagem: ${flashcards.length} (${masteredCount} dominados)\n\nPratique grátis pelo celular ou PC:\n${APP_SHARE_URL}`;
+
+  const handleNativeOrWhatsAppShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Meu Progresso no FluentFlow',
+          text: shareMessage,
+          url: APP_SHARE_URL,
+        });
+        return;
+      } catch {
+        // Caso o usuário cancele o share nativo, mantém o modal aberto
+      }
+    }
+    const waUrl = `https://wa.me/?text=${encodeURIComponent(shareMessage)}`;
+    window.open(waUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleCopyShare = async () => {
+    try {
+      await navigator.clipboard.writeText(shareMessage);
+      if (onAwardXP) {
+        onAwardXP(0, 'Card de conquista e link copiados! Cole no WhatsApp ou grupos.');
+      }
+    } catch {
+      // fallback silencioso
+    }
+  };
 
   const handleQuickRate = (quality) => {
     if (!urgentCard || !onUpdateFlashcard) return;
@@ -69,15 +108,29 @@ export default function Dashboard({
   return (
     <div className="space-y-8">
       {/* Banner Principal + Meta Diária */}
-      <div className="bg-gradient-to-r from-indigo-950 via-slate-900 to-slate-900 border border-indigo-500/30 rounded-3xl p-6 sm:p-8 shadow-2xl">
+      <div className="bg-gradient-to-r from-indigo-950 via-slate-900 to-slate-900 border border-indigo-500/30 rounded-3xl p-5 sm:p-8 shadow-2xl">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
           <div className="lg:col-span-7 space-y-3">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-semibold">
-              <Sparkles className="w-3.5 h-3.5" />
-              Aprendizagem por Blocos → Recuperação Ativa → Shadowing & IA
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-semibold">
+                <Sparkles className="w-3.5 h-3.5" />
+                Aprendizagem por Blocos → Recuperação Ativa → Shadowing & IA
+              </div>
+              {onEditProfile && (
+                <button
+                  onClick={onEditProfile}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-emerald-300 text-xs font-semibold transition"
+                  title="Alterar seu nome de perfil neste aparelho"
+                >
+                  <UserCheck className="w-3.5 h-3.5" />
+                  {userName ? `Perfil: ${userName}` : 'Definir meu nome'}
+                </button>
+              )}
             </div>
             <h1 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
-              Pronto para destravar seu inglês hoje?
+              {userName
+                ? `Olá, ${userName}! Pronto para destravar seu inglês hoje?`
+                : 'Pronto para destravar seu inglês hoje?'}
             </h1>
             <p className="text-sm sm:text-base text-slate-300 max-w-2xl">
               Aprenda frases completas usadas por nativos, recupere ativamente da memória, treine sua pronúncia por Shadowing e converse em cenários reais.
@@ -162,6 +215,14 @@ export default function Dashboard({
                 <p className="text-[11px] text-slate-400">Dominados</p>
               </div>
             </div>
+
+            <button
+              onClick={() => setShowShareModal(true)}
+              className="w-full py-2.5 px-3.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center justify-center gap-2 transition"
+            >
+              <Share2 className="w-4 h-4 shrink-0" />
+              <span>Compartilhar Conquista / Convidar Amigos</span>
+            </button>
           </div>
         </div>
       </div>
@@ -404,6 +465,92 @@ export default function Dashboard({
           </div>
         </div>
       </div>
+
+      {/* Modal de Card de Conquista Compartilhável */}
+      {showShareModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full max-h-[90dvh] overflow-y-auto p-5 sm:p-6 space-y-5 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base sm:text-lg font-extrabold text-white flex items-center gap-2">
+                <Trophy className="w-5 h-5 text-amber-400" />
+                Card de Conquista FluentFlow
+              </h3>
+              <button
+                onClick={() => setShowShareModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Card Visual de Conquista (Pronto para Print ou Compartilhamento) */}
+            <div className="bg-gradient-to-br from-indigo-950 via-slate-900 to-emerald-950/90 border border-indigo-500/40 rounded-2xl p-5 space-y-4 shadow-xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-emerald-500 flex items-center justify-center font-black text-white text-sm">
+                    FF
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-indigo-300 uppercase tracking-wider">
+                      FluentFlow Studio
+                    </p>
+                    <p className="text-base font-extrabold text-white">
+                      {userName || 'Estudante Dedicado'}
+                    </p>
+                  </div>
+                </div>
+                <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-[11px] font-bold">
+                  Meta {progressPercent}%
+                </span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800">
+                  <p className="text-lg font-extrabold text-amber-400">
+                    🔥 {streak}d
+                  </p>
+                  <p className="text-[10px] text-slate-400">Ofensiva</p>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800">
+                  <p className="text-lg font-extrabold text-indigo-300">
+                    🏆 {xp}
+                  </p>
+                  <p className="text-[10px] text-slate-400">XP Total</p>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800">
+                  <p className="text-lg font-extrabold text-emerald-400">
+                    🧠 {flashcards.length}
+                  </p>
+                  <p className="text-[10px] text-slate-400">Blocos</p>
+                </div>
+              </div>
+
+              <div className="pt-1 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
+                <span>🌐 avlis98.github.io/fluentflow</span>
+                <span className="text-emerald-300 font-semibold">100% Gratuito</span>
+              </div>
+            </div>
+
+            <div className="space-y-2.5">
+              <button
+                onClick={handleNativeOrWhatsAppShare}
+                className="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition shadow-lg shadow-emerald-600/25"
+              >
+                <Share2 className="w-4 h-4" />
+                Enviar no WhatsApp / Compartilhar
+              </button>
+
+              <button
+                onClick={handleCopyShare}
+                className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs flex items-center justify-center gap-2 border border-slate-700 transition"
+              >
+                <Copy className="w-3.5 h-3.5 text-indigo-400" />
+                Copiar Resumo + Link de Convite
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -13,6 +13,7 @@ import {
   Download,
   Upload,
   Smartphone,
+  User,
 } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import InteractiveReader from './components/InteractiveReader';
@@ -31,6 +32,9 @@ export default function App() {
   const [flashcards, setFlashcards] = useState(INITIAL_FLASHCARDS);
   const [completedTexts, setCompletedTexts] = useState([]);
   const [geminiApiKey, setGeminiApiKey] = useState('');
+  const [userName, setUserName] = useState('');
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
+  const [tempNameInput, setTempNameInput] = useState('');
   const [showSettings, setShowSettings] = useState(false);
   const [showInstallGuide, setShowInstallGuide] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -72,6 +76,13 @@ export default function App() {
         if (typeof parsed.geminiApiKey === 'string') {
           setGeminiApiKey(parsed.geminiApiKey);
         }
+        if (typeof parsed.userName === 'string' && parsed.userName.trim()) {
+          setUserName(parsed.userName.trim());
+        } else {
+          setShowWelcomeModal(true);
+        }
+      } else {
+        setShowWelcomeModal(true);
       }
     } catch {
       // Ignora erro de parse do storage
@@ -90,12 +101,13 @@ export default function App() {
           flashcards,
           completedTexts,
           geminiApiKey,
+          userName,
         })
       );
     } catch {
       // Ignora erro de escrita
     }
-  }, [xp, dailyGoal, streak, flashcards, completedTexts, geminiApiKey]);
+  }, [xp, dailyGoal, streak, flashcards, completedTexts, geminiApiKey, userName]);
 
   const showNotification = (message) => {
     setToast(message);
@@ -119,7 +131,7 @@ export default function App() {
 
   const handleExportProgress = () => {
     const dataStr = JSON.stringify(
-      { xp, dailyGoal, streak, flashcards, completedTexts },
+      { userName, xp, dailyGoal, streak, flashcards, completedTexts },
       null,
       2
     );
@@ -140,6 +152,9 @@ export default function App() {
     reader.onload = (event) => {
       try {
         const parsed = JSON.parse(event.target.result);
+        if (typeof parsed.userName === 'string' && parsed.userName.trim()) {
+          setUserName(parsed.userName.trim());
+        }
         if (Array.isArray(parsed.flashcards)) setFlashcards(parsed.flashcards);
         if (typeof parsed.xp === 'number') setXp(parsed.xp);
         if (typeof parsed.streak === 'number') setStreak(parsed.streak);
@@ -330,6 +345,11 @@ export default function App() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-4 sm:py-6">
         {activeTab === 'dashboard' && (
           <Dashboard
+            userName={userName}
+            onEditProfile={() => {
+              setTempNameInput(userName);
+              setShowWelcomeModal(true);
+            }}
             selectedLevel={selectedLevel}
             onSelectLevel={setSelectedLevel}
             onNavigate={setActiveTab}
@@ -470,6 +490,19 @@ export default function App() {
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  Seu Nome no App
+                </label>
+                <input
+                  type="text"
+                  value={userName}
+                  onChange={(e) => setUserName(e.target.value)}
+                  placeholder="Como você quer ser chamado(a)?"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
                   Meta Diária de Estudo (XP)
                 </label>
                 <select
@@ -556,6 +589,79 @@ export default function App() {
                 Concluído
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Modal de Boas-Vindas / Perfil Local no 1º Acesso */}
+      {showWelcomeModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-slate-900 border border-indigo-500/40 rounded-3xl max-w-md w-full max-h-[90dvh] overflow-y-auto p-6 space-y-5 shadow-2xl">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-emerald-500 flex items-center justify-center text-white font-black text-xl shrink-0">
+                FF
+              </div>
+              <div>
+                <h3 className="text-lg font-extrabold text-white">
+                  Bem-vindo(a) ao FluentFlow!
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Seu progresso fica salvo automaticamente neste aparelho.
+                </p>
+              </div>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const clean = tempNameInput.trim() || 'Estudante';
+                setUserName(clean);
+                setShowWelcomeModal(false);
+                showNotification(`Tudo pronto, ${clean}! Bons estudos!`);
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                  Como você gostaria de ser chamado(a)?
+                </label>
+                <div className="flex items-center gap-2">
+                  <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-indigo-400">
+                    <User className="w-4 h-4" />
+                  </div>
+                  <input
+                    type="text"
+                    autoFocus
+                    value={tempNameInput}
+                    onChange={(e) => setTempNameInput(e.target.value)}
+                    placeholder="Digite seu nome ou apelido..."
+                    className="flex-1 px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                  Qual nível você quer priorizar agora?
+                </label>
+                <select
+                  value={selectedLevel}
+                  onChange={(e) => setSelectedLevel(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs sm:text-sm text-white"
+                >
+                  <option value="ALL">Todos os Níveis (A1 ao C1)</option>
+                  <option value="A1-A2">Básico (A1–A2)</option>
+                  <option value="B1-B2">Intermediário (B1–B2)</option>
+                  <option value="C1-C2">Avançado (C1–C2)</option>
+                </select>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm transition shadow-lg shadow-indigo-600/30"
+              >
+                Começar Minha Jornada →
+              </button>
+            </form>
           </div>
         </div>
       )}
