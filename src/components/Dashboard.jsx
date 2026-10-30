@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   BookOpen,
   Layers,
@@ -9,8 +9,13 @@ import {
   ArrowRight,
   CheckCircle2,
   Target,
+  Volume2,
+  Lightbulb,
+  Brain,
 } from 'lucide-react';
 import { LEVELS, INTERACTIVE_TEXTS, ROLEPLAY_SCENARIOS } from '../data/content';
+import { getSmartReviewQueue, calculateNextReview } from '../utils/srs';
+import { speakText, generateProgressiveHint } from '../utils/speech';
 
 export default function Dashboard({
   selectedLevel,
@@ -21,18 +26,45 @@ export default function Dashboard({
   streak,
   flashcards,
   completedTexts,
+  onUpdateFlashcard,
+  onAwardXP,
 }) {
-  const dueCardsCount = flashcards.filter(
-    (c) => (c.nextReview || 0) <= Date.now()
-  ).length;
+  const smartQueue = useMemo(
+    () => getSmartReviewQueue(flashcards),
+    [flashcards]
+  );
+  const dueCardsCount = smartQueue.length;
   const masteredCount = flashcards.filter(
     (c) => c.status === 'mastered' || (c.interval || 0) >= 7
   ).length;
   const learningCount = flashcards.filter(
-    (c) => c.status === 'learning' && (c.interval || 0) < 7
+    (c) =>
+      (c.status === 'learning' || c.status === 'relearning') &&
+      (c.interval || 0) < 7
   ).length;
 
+  // Estado da Micro-Revisão Diária Integrada (Item 2.B e 2.C)
+  const [quickHintLevel, setQuickHintLevel] = useState(0);
+  const [quickRevealed, setQuickRevealed] = useState(false);
+
+  const urgentCard = smartQueue[0] || null;
   const progressPercent = Math.min(100, Math.round((xp / dailyGoal) * 100));
+
+  const handleQuickRate = (quality) => {
+    if (!urgentCard || !onUpdateFlashcard) return;
+    const updated = calculateNextReview(urgentCard, quality);
+    onUpdateFlashcard(updated);
+    if (onAwardXP) {
+      onAwardXP(
+        quality >= 2 ? 10 : 5,
+        quality >= 2
+          ? 'Revisão rápida concluída! +10 XP'
+          : 'Agendado para reforço prioritário! +5 XP'
+      );
+    }
+    setQuickHintLevel(0);
+    setQuickRevealed(false);
+  };
 
   return (
     <div className="space-y-8">
@@ -42,13 +74,13 @@ export default function Dashboard({
           <div className="lg:col-span-7 space-y-3">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-semibold">
               <Sparkles className="w-3.5 h-3.5" />
-              Ciclo Integrado de Fluência: Input → Retenção → Conversação
+              Aprendizagem por Blocos → Recuperação Ativa → Shadowing & IA
             </div>
             <h1 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
               Pronto para destravar seu inglês hoje?
             </h1>
             <p className="text-sm sm:text-base text-slate-300 max-w-2xl">
-              Leia textos e músicas interativas com áudio nativo, salve palavras com 1 clique nos seus Flashcards inteligentes e pratique em situações reais com IA.
+              Aprenda frases completas usadas por nativos, recupere ativamente da memória, treine sua pronúncia por Shadowing e converse em cenários reais.
             </p>
 
             {/* Seletor de Nível */}
@@ -113,7 +145,7 @@ export default function Dashboard({
                 <p className="text-lg font-extrabold text-white">
                   {flashcards.length}
                 </p>
-                <p className="text-[11px] text-slate-400">Total de Cards</p>
+                <p className="text-[11px] text-slate-400">Blocos & Frases</p>
               </div>
               <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800/80">
                 <p className="text-lg font-extrabold text-amber-400">
@@ -125,12 +157,102 @@ export default function Dashboard({
                 <p className="text-lg font-extrabold text-emerald-400">
                   {masteredCount}
                 </p>
-                <p className="text-[11px] text-slate-400">Dominadas</p>
+                <p className="text-[11px] text-slate-400">Dominados</p>
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Micro-Revisão Diária Integrada (Sem interromper o conteúdo novo) */}
+      {urgentCard && (
+        <div className="bg-slate-900/90 border border-indigo-500/30 rounded-2xl p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="space-y-1.5 flex-1">
+            <div className="flex items-center gap-2">
+              <Brain className="w-4 h-4 text-amber-400" />
+              <span className="text-xs font-bold uppercase tracking-wider text-amber-300">
+                Dose Rápida de Recuperação Ativa (1 de {dueCardsCount} prioritários)
+              </span>
+            </div>
+            <p className="text-sm text-slate-300">
+              Como você diria em inglês:{' '}
+              <strong className="text-emerald-300">
+                “{urgentCard.translation}”
+              </strong>
+              ?
+            </p>
+            {quickHintLevel > 0 && !quickRevealed && (
+              <p className="text-xs font-mono text-amber-200">
+                💡 {generateProgressiveHint(urgentCard.word, quickHintLevel)}
+              </p>
+            )}
+            {quickRevealed && (
+              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1 mt-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-base font-extrabold text-white">
+                    “{urgentCard.word}”
+                  </span>
+                  <button
+                    onClick={() => speakText(urgentCard.example || urgentCard.word)}
+                    className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
+                  >
+                    <Volume2 className="w-3.5 h-3.5" /> Ouvir
+                  </button>
+                </div>
+                <p className="text-xs text-slate-400 italic">
+                  "{urgentCard.example}"
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {!quickRevealed ? (
+              <>
+                <button
+                  onClick={() =>
+                    setQuickHintLevel((prev) => Math.min(3, prev + 1))
+                  }
+                  className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs font-semibold flex items-center gap-1.5 border border-slate-700"
+                >
+                  <Lightbulb className="w-3.5 h-3.5" />
+                  Pista ({quickHintLevel}/3)
+                </button>
+                <button
+                  onClick={() => {
+                    setQuickRevealed(true);
+                    speakText(urgentCard.word);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold"
+                >
+                  Conferir Resposta
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => handleQuickRate(0)}
+                  className="px-3 py-2 rounded-xl bg-rose-950/80 hover:bg-rose-900 border border-rose-500/40 text-rose-200 text-xs font-bold"
+                >
+                  Esqueci
+                </button>
+                <button
+                  onClick={() => handleQuickRate(2)}
+                  className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold"
+                >
+                  Lembrei Bem (+10 XP)
+                </button>
+                <button
+                  onClick={() => handleQuickRate(3)}
+                  className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold"
+                >
+                  Já Domino
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Os 3 Pilares Principais */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -148,10 +270,10 @@ export default function Dashboard({
 
             <div>
               <h2 className="text-lg font-bold text-white group-hover:text-indigo-300 transition">
-                1. Textos & Músicas Interativas
+                1. Textos, Músicas & Shadowing
               </h2>
               <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                Ouça com sotaque americano ou britânico, clique em qualquer palavra para ver a tradução no contexto e envie direto para os seus Flashcards.
+                Ouça em velocidade natural ou reduzida (`0.75x`), pratique **Shadowing** parágrafo por parágrafo e salve blocos de linguagem com 1 clique.
               </p>
             </div>
           </div>
@@ -173,16 +295,16 @@ export default function Dashboard({
                 <Layers className="w-6 h-6" />
               </div>
               <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                {dueCardsCount} pendentes hoje
+                {dueCardsCount} prioritários hoje
               </span>
             </div>
 
             <div>
               <h2 className="text-lg font-bold text-white group-hover:text-emerald-300 transition">
-                2. Flashcards Inteligentes (Anki)
+                2. Blocos, Recuperação Ativa & Pronúncia
               </h2>
               <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                Memorize de verdade com repetição espaçada (SM-2) e treino auditivo de ditado. Inclui seus cartões salvos durante a leitura e conversação!
+                Repetição espaçada inteligente que prioriza erros, exercícios de **Recuperação Ativa** com pistas graduais e treino de **Shadowing**.
               </p>
             </div>
           </div>
@@ -191,7 +313,7 @@ export default function Dashboard({
             onClick={() => onNavigate('flashcards')}
             className="mt-6 w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition shadow-lg shadow-emerald-600/20"
           >
-            Iniciar Revisão ({dueCardsCount})
+            Praticar Blocos ({dueCardsCount})
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>
@@ -213,7 +335,7 @@ export default function Dashboard({
                 3. Roleplay & Conversação IA
               </h2>
               <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                Simule uma cafeteria em NY, imigração no aeroporto, hotel em Londres ou entrevista de trabalho falando pelo microfone ou digitando.
+                Simule situações reais falando pelo microfone ou digitando, receba sugestões de blocos naturais e repita em voz alta.
               </p>
             </div>
           </div>
@@ -231,17 +353,17 @@ export default function Dashboard({
       {/* Roteiro Recomendado de 15 Minutos */}
       <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-6">
         <h3 className="text-sm font-bold uppercase tracking-wider text-indigo-400 mb-4">
-          ⚡ Roteiro Diário Recomendado (15 min/dia)
+          ⚡ Ciclo Diário de Fluência (15 min/dia)
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
           <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800/80 flex items-start gap-3">
             <CheckCircle2 className="w-5 h-5 text-indigo-400 shrink-0" />
             <div>
               <p className="font-bold text-white mb-0.5">
-                Passo 1: 5 min de Input (Leitura + Áudio)
+                1. Blocos em Contexto
               </p>
               <p className="text-slate-400">
-                Leia um texto curto ouvindo a pronúncia e salve 3 palavras novas nos seus Flashcards.
+                Leia um texto curto e salve expressões completas em vez de palavras isoladas.
               </p>
             </div>
           </div>
@@ -249,10 +371,21 @@ export default function Dashboard({
             <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
             <div>
               <p className="font-bold text-white mb-0.5">
-                Passo 2: 5 min de Flashcards (SM-2)
+                2. Recuperação Ativa
               </p>
               <p className="text-slate-400">
-                Revise os cartões agendados para hoje e teste seu ouvido no modo Ditado.
+                Tente produzir a frase em inglês com pistas graduais antes de revelar a resposta.
+              </p>
+            </div>
+          </div>
+          <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800/80 flex items-start gap-3">
+            <CheckCircle2 className="w-5 h-5 text-rose-400 shrink-0" />
+            <div>
+              <p className="font-bold text-white mb-0.5">
+                3. Técnica Shadowing
+              </p>
+              <p className="text-slate-400">
+                Ouça em `1.0x` ou `0.75x`, repita no microfone e compare sua pronúncia palavra por palavra.
               </p>
             </div>
           </div>
@@ -260,10 +393,10 @@ export default function Dashboard({
             <CheckCircle2 className="w-5 h-5 text-amber-400 shrink-0" />
             <div>
               <p className="font-bold text-white mb-0.5">
-                Passo 3: 5 min de Prática Ativa (Roleplay)
+                4. Aplicação no Roleplay
               </p>
               <p className="text-slate-400">
-                Conclua as 3 missões de um cenário usando sua voz para ganhar confiança na fala.
+                Use as expressões aprendidas conversando nos cenários interativos com IA.
               </p>
             </div>
           </div>

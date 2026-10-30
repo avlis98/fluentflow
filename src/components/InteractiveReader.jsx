@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Volume2,
   Square,
@@ -12,9 +12,17 @@ import {
   HelpCircle,
   Globe,
   Gauge,
+  Mic,
+  MicOff,
+  AudioWaveform,
 } from 'lucide-react';
 import { INTERACTIVE_TEXTS, COMMON_DICTIONARY } from '../data/content';
-import { speakText, stopSpeaking } from '../utils/speech';
+import {
+  speakText,
+  stopSpeaking,
+  createSpeechRecognition,
+  evaluatePronunciation,
+} from '../utils/speech';
 
 export default function InteractiveReader({
   selectedLevel,
@@ -43,12 +51,22 @@ export default function InteractiveReader({
   const [quizAnswers, setQuizAnswers] = useState({});
   const [quizSubmitted, setQuizSubmitted] = useState(false);
 
+  // Estado de Shadowing por parágrafo
+  const [shadowingParaIdx, setShadowingParaIdx] = useState(null);
+  const [isRecordingShadow, setIsRecordingShadow] = useState(false);
+  const [shadowResultsByPara, setShadowResultsByPara] = useState({});
+  const recognitionRef = useRef(null);
+
   useEffect(() => {
     stopSpeaking();
+    recognitionRef.current?.stop();
     setPlayingParagraphIdx(null);
     setSelectedWordInfo(null);
     setQuizAnswers({});
     setQuizSubmitted(false);
+    setShadowingParaIdx(null);
+    setIsRecordingShadow(false);
+    setShadowResultsByPara({});
     setAccent(activeText.accent || 'en-US');
   }, [activeTextId]);
 
@@ -75,7 +93,7 @@ export default function InteractiveReader({
     playParagraph(0);
   };
 
-  const handlePlayParagraph = (index) => {
+  const handlePlayParagraph = (index, customRate = speechRate) => {
     if (playingParagraphIdx === index) {
       stopSpeaking();
       setPlayingParagraphIdx(null);
@@ -83,13 +101,49 @@ export default function InteractiveReader({
     }
     setPlayingParagraphIdx(index);
     speakText(activeText.paragraphs[index].en.replace(/🎵/g, ''), {
-      rate: speechRate,
+      rate: customRate,
       accent,
       onEnd: () => setPlayingParagraphIdx(null),
     });
   };
 
-  const handleWordClick = (rawToken, paragraphSentence) => {
+  const handleToggleParagraphShadowing = (pIdx, paragraphText) => {
+    if (isRecordingShadow && shadowingParaIdx === pIdx) {
+      recognitionRef.current?.stop();
+      setIsRecordingShadow(false);
+      return;
+    }
+
+    setShadowingParaIdx(pIdx);
+    const recognition = createSpeechRecognition({
+      lang: accent,
+      onResult: (transcript) => {
+        const evaluation = evaluatePronunciation(paragraphText, transcript);
+        setShadowResultsByPara((prev) => ({
+          ...prev,
+          [pIdx]: {
+            transcript,
+            ...evaluation,
+          },
+        }));
+      },
+      onError: () => setIsRecordingShadow(false),
+      onEnd: () => setIsRecordingShadow(false),
+    });
+
+    if (!recognition) {
+      alert(
+        'Para treinar pronúncia por Shadowing, utilize o navegador Chrome ou Edge.'
+      );
+      return;
+    }
+
+    recognitionRef.current = recognition;
+    setIsRecordingShadow(true);
+    recognition.start();
+  };
+
+  const handleWordClick = (rawToken, paragraphSentence, paragraphTranslation) => {
     const cleanKey = rawToken
       .toLowerCase()
       .replace(/[^a-z']/g, '')
@@ -105,7 +159,9 @@ export default function InteractiveReader({
           phonetic: curated.phonetic,
           translation: curated.translation,
           partOfSpeech: curated.partOfSpeech,
+          usageExplanation: `Bloco/expressão de nível ${activeText.level} usado em "${activeText.title}".`,
           example: curated.example || paragraphSentence,
+          exampleTranslation: paragraphTranslation,
           isCurated: true,
         }
       : {
@@ -113,9 +169,11 @@ export default function InteractiveReader({
           phonetic: common?.phonetic || '/.../',
           translation:
             common?.translation ||
-            'Palavra do contexto (você pode editar ou salvar direto no seu baralho)',
-          partOfSpeech: 'Vocabulário',
+            'Expressão do contexto (salve o bloco ou a frase completa nos seus Flashcards)',
+          partOfSpeech: 'Bloco Contextual',
+          usageExplanation: 'Extraído diretamente da frase original do texto.',
           example: paragraphSentence,
+          exampleTranslation: paragraphTranslation,
           isCurated: false,
         };
 
@@ -136,9 +194,12 @@ export default function InteractiveReader({
       word: selectedWordInfo.word,
       phonetic: selectedWordInfo.phonetic,
       translation: selectedWordInfo.translation,
+      usageExplanation: selectedWordInfo.usageExplanation,
       example: selectedWordInfo.example.replace(/🎵/g, '').trim(),
-      exampleTranslation: `Extraído de: "${activeText.title}"`,
-      deck: 'Salvos da Leitura',
+      exampleTranslation:
+        selectedWordInfo.exampleTranslation ||
+        `Extraído de: "${activeText.title}"`,
+      deck: 'Blocos da Leitura',
       level: activeText.level,
     });
   };
@@ -161,7 +222,7 @@ export default function InteractiveReader({
             Biblioteca Interativa
           </h2>
           <p className="text-xs text-slate-400 mb-4">
-            Clique em qualquer palavra do texto para ouvir a pronúncia e salvar nos seus Flashcards.
+            Toque nas expressões para ouvir, ver o uso em contexto e praticar Shadowing em cada parágrafo.
           </p>
 
           <div className="space-y-2.5">
@@ -196,7 +257,9 @@ export default function InteractiveReader({
                     <h3 className="text-sm font-semibold text-slate-100 truncate">
                       {item.title}
                     </h3>
-                    <p className="text-xs text-slate-400 truncate">{item.subtitle}</p>
+                    <p className="text-xs text-slate-400 truncate">
+                      {item.subtitle}
+                    </p>
                   </div>
                 </button>
               );
@@ -204,12 +267,12 @@ export default function InteractiveReader({
           </div>
         </div>
 
-        {/* Painel da Palavra Clicada (Dicionário Instantâneo + 1-Click Flashcard) */}
+        {/* Painel do Bloco/Palavra Clicada */}
         <div className="bg-gradient-to-br from-indigo-950/70 via-slate-900 to-slate-900 border border-indigo-500/30 rounded-2xl p-5 sticky top-24">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-semibold uppercase tracking-wider text-indigo-400 flex items-center gap-1.5">
               <Sparkles className="w-4 h-4" />
-              Inspetor de Vocabulário
+              Inspetor de Blocos & Expressões
             </span>
             {selectedWordInfo && (
               <span className="text-[11px] px-2 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
@@ -223,7 +286,7 @@ export default function InteractiveReader({
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-xl font-extrabold text-white">
-                    {selectedWordInfo.word}
+                    “{selectedWordInfo.word}”
                   </h3>
                   <p className="text-xs font-mono text-indigo-300">
                     {selectedWordInfo.phonetic}
@@ -241,14 +304,28 @@ export default function InteractiveReader({
               </div>
 
               <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800">
-                <p className="text-xs text-slate-400 mb-0.5">Significado no contexto:</p>
+                <p className="text-xs text-slate-400 mb-0.5">
+                  Significado no contexto:
+                </p>
                 <p className="text-sm font-semibold text-emerald-300">
                   {selectedWordInfo.translation}
                 </p>
               </div>
 
               <div>
-                <p className="text-xs text-slate-400 mb-1">Exemplo prático:</p>
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs text-slate-400">
+                    Frase completa de aplicação:
+                  </p>
+                  <button
+                    onClick={() =>
+                      speakText(selectedWordInfo.example, { rate: 0.95, accent })
+                    }
+                    className="text-[11px] text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
+                  >
+                    <Volume2 className="w-3 h-3" /> Ouvir frase
+                  </button>
+                </div>
                 <p className="text-xs text-slate-200 italic bg-slate-950/50 p-2.5 rounded-lg border border-slate-800/80">
                   "{selectedWordInfo.example}"
                 </p>
@@ -271,7 +348,7 @@ export default function InteractiveReader({
                 ) : (
                   <>
                     <Plus className="w-4 h-4" />
-                    Salvar nos Flashcards (+10 XP)
+                    Salvar Bloco nos Flashcards (+10 XP)
                   </>
                 )}
               </button>
@@ -279,17 +356,21 @@ export default function InteractiveReader({
           ) : (
             <div className="text-center py-6 text-slate-400">
               <p className="text-sm font-medium text-slate-300 mb-1">
-                Toque em qualquer palavra do texto
+                Toque em qualquer expressão do texto
               </p>
               <p className="text-xs">
-                As palavras sublinhadas em <span className="text-indigo-400 underline decoration-dotted">azul</span> possuem notas especiais e expressões idiomáticas!
+                Os blocos sublinhados em{' '}
+                <span className="text-indigo-400 underline decoration-dotted">
+                  azul
+                </span>{' '}
+                destacam *phrasal verbs* e expressões reais de nativos!
               </p>
             </div>
           )}
         </div>
       </div>
 
-      {/* Área Principal de Leitura e Áudio */}
+      {/* Área Principal de Leitura, Áudio e Shadowing */}
       <div className="lg:col-span-8 space-y-6">
         <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6">
           {/* Cabeçalho e controles de áudio */}
@@ -393,33 +474,56 @@ export default function InteractiveReader({
             </div>
           </div>
 
-          {/* Parágrafos Interativos */}
+          {/* Parágrafos Interativos + Botão de Shadowing Integrado */}
           <div className="space-y-5 mt-4">
             {activeText.paragraphs.map((para, pIdx) => {
               const isPlayingThis = playingParagraphIdx === pIdx;
+              const isShadowingThis =
+                isRecordingShadow && shadowingParaIdx === pIdx;
+              const shadowEval = shadowResultsByPara[pIdx];
               const tokens = para.en.split(' ');
 
               return (
                 <div
                   key={pIdx}
-                  className={`p-4 rounded-2xl border transition-all ${
+                  className={`p-4 rounded-2xl border transition-all space-y-3 ${
                     isPlayingThis
                       ? 'bg-indigo-950/40 border-indigo-500/60 shadow-md'
                       : 'bg-slate-950/40 border-slate-800/80 hover:border-slate-700/80'
                   }`}
                 >
                   <div className="flex items-start gap-3">
-                    <button
-                      onClick={() => handlePlayParagraph(pIdx)}
-                      className={`mt-1 p-2 rounded-lg shrink-0 transition ${
-                        isPlayingThis
-                          ? 'bg-indigo-600 text-white'
-                          : 'bg-slate-800/90 text-slate-300 hover:bg-indigo-600 hover:text-white'
-                      }`}
-                      title="Ouvir este trecho"
-                    >
-                      <Volume2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex flex-col gap-1.5 shrink-0 mt-1">
+                      <button
+                        onClick={() => handlePlayParagraph(pIdx)}
+                        className={`p-2 rounded-lg transition ${
+                          isPlayingThis
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-slate-800/90 text-slate-300 hover:bg-indigo-600 hover:text-white'
+                        }`}
+                        title="Ouvir este trecho"
+                      >
+                        <Volume2 className="w-4 h-4" />
+                      </button>
+
+                      <button
+                        onClick={() =>
+                          handleToggleParagraphShadowing(pIdx, para.en)
+                        }
+                        className={`p-2 rounded-lg transition ${
+                          isShadowingThis
+                            ? 'bg-rose-600 text-white animate-pulse'
+                            : 'bg-slate-800/90 text-amber-300 hover:bg-amber-600 hover:text-white'
+                        }`}
+                        title="Praticar Shadowing (repetir no microfone)"
+                      >
+                        {isShadowingThis ? (
+                          <MicOff className="w-4 h-4" />
+                        ) : (
+                          <Mic className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
 
                     <div className="space-y-2 flex-1">
                       <p className="text-lg leading-relaxed text-slate-100 font-medium">
@@ -437,12 +541,21 @@ export default function InteractiveReader({
                               .toLowerCase()
                               .includes(clean);
 
+                          const shadowWordStatus =
+                            shadowEval?.wordAnalysis?.[tIdx]?.status;
+
                           return (
                             <React.Fragment key={tIdx}>
                               <span
-                                onClick={() => handleWordClick(token, para.en)}
+                                onClick={() =>
+                                  handleWordClick(token, para.en, para.pt)
+                                }
                                 className={`cursor-pointer rounded px-0.5 transition-colors ${
-                                  isSelectedWord
+                                  shadowWordStatus === 'correct'
+                                    ? 'bg-emerald-500/20 text-emerald-300 font-semibold'
+                                    : shadowWordStatus === 'missed'
+                                    ? 'bg-rose-500/20 text-rose-300 underline decoration-wavy'
+                                    : isSelectedWord
                                     ? 'bg-indigo-500 text-white font-semibold'
                                     : isHighlighted
                                     ? 'text-indigo-300 underline decoration-indigo-400/70 decoration-dotted underline-offset-4 hover:bg-indigo-500/20 font-semibold'
@@ -460,6 +573,47 @@ export default function InteractiveReader({
                         <p className="text-sm text-slate-400 border-l-2 border-slate-700 pl-3">
                           {para.pt}
                         </p>
+                      )}
+
+                      {/* Barra de ações rápidas do parágrafo (Shadowing lento + feedback) */}
+                      <div className="pt-1 flex flex-wrap items-center gap-2 text-[11px]">
+                        <button
+                          type="button"
+                          onClick={() => handlePlayParagraph(pIdx, 0.75)}
+                          className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800"
+                        >
+                          🐢 Ouvir 0.75x
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleToggleParagraphShadowing(pIdx, para.en)
+                          }
+                          className={`px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1 border ${
+                            isShadowingThis
+                              ? 'bg-rose-600/30 border-rose-500 text-rose-200'
+                              : 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-amber-300'
+                          }`}
+                        >
+                          <AudioWaveform className="w-3.5 h-3.5" />
+                          {isShadowingThis
+                            ? 'Gravando... clique p/ parar'
+                            : 'Treinar Shadowing'}
+                        </button>
+                      </div>
+
+                      {shadowEval && (
+                        <div className="p-3 rounded-xl bg-slate-900/95 border border-slate-800 text-xs space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-emerald-400">
+                              🎙️ Precisão do Shadowing: {shadowEval.accuracy}%
+                            </span>
+                            <span className="text-slate-400 italic truncate max-w-xs">
+                              Você disse: "{shadowEval.transcript}"
+                            </span>
+                          </div>
+                          <p className="text-slate-300">{shadowEval.feedback}</p>
+                        </div>
                       )}
                     </div>
                   </div>

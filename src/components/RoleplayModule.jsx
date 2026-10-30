@@ -12,9 +12,14 @@ import {
   RotateCcw,
   Plus,
   Languages,
+  AudioWaveform,
 } from 'lucide-react';
 import { ROLEPLAY_SCENARIOS, analyzeUserEnglish } from '../data/content';
-import { speakText, createSpeechRecognition } from '../utils/speech';
+import {
+  speakText,
+  createSpeechRecognition,
+  evaluatePronunciation,
+} from '../utils/speech';
 
 export default function RoleplayModule({
   selectedLevel,
@@ -41,6 +46,11 @@ export default function RoleplayModule({
   const [isLoadingAI, setIsLoadingAI] = useState(false);
   const [showTranslations, setShowTranslations] = useState(true);
   const [currentHint, setCurrentHint] = useState('');
+  const [revealHintText, setRevealHintText] = useState(false);
+
+  // Estado de Shadowing dentro do Chat
+  const [shadowTargetMsgId, setShadowTargetMsgId] = useState(null);
+  const [shadowResults, setShadowResults] = useState({});
 
   const chatEndRef = useRef(null);
   const recognitionRef = useRef(null);
@@ -56,7 +66,10 @@ export default function RoleplayModule({
     ]);
     setCompletedMissions([]);
     setCurrentHint(scen.turns[0]?.hint || '');
+    setRevealHintText(false);
     setInputText('');
+    setShadowTargetMsgId(null);
+    setShadowResults({});
   };
 
   useEffect(() => {
@@ -99,6 +112,37 @@ export default function RoleplayModule({
     recognition.start();
   };
 
+  const handleShadowPhrase = (msgId, targetSentence) => {
+    if (shadowTargetMsgId === msgId) {
+      recognitionRef.current?.stop();
+      setShadowTargetMsgId(null);
+      return;
+    }
+
+    setShadowTargetMsgId(msgId);
+    const recognition = createSpeechRecognition({
+      lang: scenario.accent || 'en-US',
+      onResult: (transcript) => {
+        const res = evaluatePronunciation(targetSentence, transcript);
+        setShadowResults((prev) => ({
+          ...prev,
+          [msgId]: { transcript, ...res },
+        }));
+      },
+      onError: () => setShadowTargetMsgId(null),
+      onEnd: () => setShadowTargetMsgId(null),
+    });
+
+    if (!recognition) {
+      alert('Abra no Chrome ou Edge para usar o microfone.');
+      setShadowTargetMsgId(null);
+      return;
+    }
+
+    recognitionRef.current = recognition;
+    recognition.start();
+  };
+
   const evaluateMissions = (userMessageLower) => {
     const newlyCompleted = [...completedMissions];
     let earnedMissionXP = false;
@@ -124,7 +168,6 @@ export default function RoleplayModule({
   const generateSmartReply = async (userText) => {
     const lower = userText.toLowerCase();
 
-    // Se o usuário configurou uma chave da API Gemini nas configurações, usa IA generativa em tempo real
     if (geminiApiKey && geminiApiKey.trim().length > 10) {
       try {
         const prompt = `You are playing the role of "${scenario.role}" in the scenario "${scenario.title}" (${scenario.description}).
@@ -166,8 +209,8 @@ Respond in valid JSON with keys:
                 vocabToSave: parsed.betterWay
                   ? {
                       word: parsed.betterWay,
-                      phonetic: '/AI suggestion/',
-                      translation: 'Sugestão natural do Roleplay',
+                      phonetic: '/AI chunk/',
+                      translation: 'Bloco natural sugerido no Roleplay',
                       example: parsed.betterWay,
                     }
                   : null,
@@ -180,7 +223,6 @@ Respond in valid JSON with keys:
       }
     }
 
-    // Motor inteligente local baseado no contexto do turno
     for (let i = 0; i < scenario.turns.length; i++) {
       const turn = scenario.turns[i];
       if (turn.match.some((kw) => lower.includes(kw))) {
@@ -200,7 +242,7 @@ Respond in valid JSON with keys:
       translation: scenario.defaultTranslation,
       hint:
         scenario.turns[0]?.hint ||
-        "Try using one of the keywords from the mission list on the left!",
+        'Try using one of the keywords from the mission list on the left!',
     };
   };
 
@@ -221,6 +263,7 @@ Respond in valid JSON with keys:
 
     setMessages((prev) => [...prev, userMsg]);
     setInputText('');
+    setRevealHintText(false);
     evaluateMissions(trimmed.toLowerCase());
     setIsLoadingAI(true);
 
@@ -258,7 +301,7 @@ Respond in valid JSON with keys:
             Cenários da Vida Real
           </h2>
           <p className="text-xs text-slate-400">
-            Pratique situações reais falando no microfone ou digitando, com correção instantânea.
+            Use os blocos aprendidos em conversas reais, com correção e Shadowing integrados.
           </p>
 
           <div className="space-y-2">
@@ -382,17 +425,31 @@ Respond in valid JSON with keys:
                       <p className="text-sm sm:text-base font-medium text-slate-100">
                         {msg.text}
                       </p>
-                      <button
-                        onClick={() =>
-                          speakText(msg.text, {
-                            accent: scenario.accent || 'en-US',
-                          })
-                        }
-                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-indigo-600 text-indigo-300 hover:text-white transition shrink-0"
-                        title="Ouvir fala do personagem"
-                      >
-                        <Volume2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={() =>
+                            speakText(msg.text, {
+                              rate: 0.75,
+                              accent: scenario.accent || 'en-US',
+                            })
+                          }
+                          className="px-1.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-300"
+                          title="Ouvir em velocidade reduzida (0.75x)"
+                        >
+                          0.75x
+                        </button>
+                        <button
+                          onClick={() =>
+                            speakText(msg.text, {
+                              accent: scenario.accent || 'en-US',
+                            })
+                          }
+                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-indigo-600 text-indigo-300 hover:text-white transition"
+                          title="Ouvir fala do personagem"
+                        >
+                          <Volume2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                     {showTranslations && msg.translation && (
                       <p className="text-xs text-slate-400 border-t border-slate-800/80 pt-2">
@@ -404,6 +461,9 @@ Respond in valid JSON with keys:
               );
             }
 
+            const shadowRes = shadowResults[msg.id];
+            const isShadowingThis = shadowTargetMsgId === msg.id;
+
             return (
               <div
                 key={msg.id}
@@ -413,7 +473,7 @@ Respond in valid JSON with keys:
                   <p className="text-sm sm:text-base font-medium">{msg.text}</p>
                 </div>
 
-                {/* Card de Feedback Gramatical / Naturalidade */}
+                {/* Card de Feedback Gramatical + Shadowing do Bloco Natural */}
                 {msg.feedback && (
                   <div
                     className={`w-full rounded-xl p-3.5 border text-xs space-y-2 ${
@@ -432,30 +492,67 @@ Respond in valid JSON with keys:
                           onClick={() =>
                             onAddFlashcard({
                               ...msg.feedback.vocabToSave,
-                              deck: 'Dicas do Roleplay',
+                              deck: 'Blocos do Roleplay',
                               level: scenario.level,
                             })
                           }
                           className="px-2 py-1 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white font-semibold flex items-center gap-1 text-[11px]"
                         >
-                          <Plus className="w-3 h-3" /> Salvar Card
+                          <Plus className="w-3 h-3" /> Salvar Bloco
                         </button>
                       )}
                     </div>
                     <p className="opacity-90">{msg.feedback.explanation}</p>
                     {msg.feedback.betterWay &&
                       msg.feedback.betterWay !== msg.text && (
-                        <div className="p-2 rounded-lg bg-slate-950/70 border border-slate-800 flex items-center justify-between gap-2">
-                          <span>
-                            💡 <strong>Forma mais natural:</strong> "
-                            {msg.feedback.betterWay}"
-                          </span>
-                          <button
-                            onClick={() => speakText(msg.feedback.betterWay)}
-                            className="p-1 rounded bg-slate-800 hover:bg-indigo-600 text-indigo-300 hover:text-white"
-                          >
-                            <Volume2 className="w-3.5 h-3.5" />
-                          </button>
+                        <div className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800 space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span>
+                              💡 <strong>Bloco mais natural:</strong> "
+                              {msg.feedback.betterWay}"
+                            </span>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                onClick={() =>
+                                  speakText(msg.feedback.betterWay, {
+                                    rate: 0.95,
+                                  })
+                                }
+                                className="p-1.5 rounded bg-slate-800 hover:bg-indigo-600 text-indigo-300 hover:text-white"
+                                title="Ouvir forma natural"
+                              >
+                                <Volume2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() =>
+                                  handleShadowPhrase(
+                                    msg.id,
+                                    msg.feedback.betterWay
+                                  )
+                                }
+                                className={`px-2 py-1 rounded text-[11px] font-semibold flex items-center gap-1 ${
+                                  isShadowingThis
+                                    ? 'bg-rose-600 text-white animate-pulse'
+                                    : 'bg-slate-800 hover:bg-amber-600 text-amber-300 hover:text-white'
+                                }`}
+                                title="Repetir a forma natural em voz alta (Shadowing)"
+                              >
+                                <AudioWaveform className="w-3 h-3" />
+                                {isShadowingThis ? 'Ouvindo...' : 'Shadowing'}
+                              </button>
+                            </div>
+                          </div>
+
+                          {shadowRes && (
+                            <div className="pt-1 border-t border-slate-800 text-[11px] text-emerald-300 flex items-center justify-between">
+                              <span>
+                                🎙️ Precisão: <strong>{shadowRes.accuracy}%</strong>
+                              </span>
+                              <span className="text-slate-400">
+                                {shadowRes.feedback}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       )}
                   </div>
@@ -473,25 +570,41 @@ Respond in valid JSON with keys:
           <div ref={chatEndRef} />
         </div>
 
-        {/* Barra de Dica (Hint) */}
+        {/* Barra de Dica Gradual (Incentiva Recuperação Ativa antes de revelar) */}
         {currentHint && (
           <div className="px-4 py-2.5 bg-indigo-950/40 border-t border-indigo-500/20 flex items-center justify-between gap-2 text-xs text-indigo-200">
             <div className="flex items-center gap-2 truncate">
               <Lightbulb className="w-4 h-4 text-amber-400 shrink-0" />
-              <span className="truncate">{currentHint}</span>
+              {revealHintText ? (
+                <span className="truncate">{currentHint}</span>
+              ) : (
+                <span className="text-slate-300">
+                  Tente formular sua resposta primeiro! Precisa de ajuda para destravar?
+                </span>
+              )}
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                const match = currentHint.match(/'([^']+)'/);
-                if (match && match[1]) {
-                  setInputText(match[1]);
-                }
-              }}
-              className="px-2.5 py-1 rounded-lg bg-indigo-600/40 hover:bg-indigo-600 text-white font-semibold shrink-0 transition"
-            >
-              Usar Sugestão
-            </button>
+            {!revealHintText ? (
+              <button
+                type="button"
+                onClick={() => setRevealHintText(true)}
+                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 font-semibold shrink-0 transition border border-slate-700"
+              >
+                Ver Pista de Bloco
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  const match = currentHint.match(/'([^']+)'/);
+                  if (match && match[1]) {
+                    setInputText(match[1]);
+                  }
+                }}
+                className="px-2.5 py-1 rounded-lg bg-indigo-600/40 hover:bg-indigo-600 text-white font-semibold shrink-0 transition"
+              >
+                Preencher Sugestão
+              </button>
+            )}
           </div>
         )}
 

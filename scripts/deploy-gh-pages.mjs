@@ -1,7 +1,21 @@
 import fs from 'fs';
 import path from 'path';
+import { execSync } from 'child_process';
+import { fileURLToPath } from 'url';
 
-const token = process.env.GH_TOKEN;
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+process.chdir(path.resolve(__dirname, '..'));
+
+let token = process.env.GH_TOKEN;
+if (!token) {
+  try {
+    token = execSync('"C:\\Program Files\\GitHub CLI\\gh.exe" auth token', {
+      encoding: 'utf8',
+    }).trim();
+  } catch {
+    // ignore
+  }
+}
 if (!token) {
   console.error('Missing GH_TOKEN environment variable.');
   process.exit(1);

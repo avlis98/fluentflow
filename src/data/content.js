@@ -476,13 +476,60 @@ export const COMMON_DICTIONARY = {
 
 export const INITIAL_FLASHCARDS = [
   {
+    id: 'card-0',
+    word: 'Could you help me?',
+    phonetic: '/kʊd juː help miː/',
+    translation: 'Você poderia me ajudar?',
+    usageExplanation:
+      'Bloco essencial para pedir ajuda com educação em qualquer lugar (lojas, aeroporto, trabalho). Para especificar a ação, use "Could you help me + verbo" ou "Could you help me with + substantivo".',
+    example: 'Excuse me, could you help me find gate B12?',
+    exampleTranslation: 'Com licença, você poderia me ajudar a encontrar o portão B12?',
+    situations: [
+      {
+        context: 'No trabalho',
+        en: 'Could you help me review this presentation?',
+        pt: 'Você poderia me ajudar a revisar esta apresentação?',
+      },
+      {
+        context: 'Em uma loja ou hotel',
+        en: 'Could you help me with my luggage, please?',
+        pt: 'Você poderia me ajudar com a minha bagagem, por favor?',
+      },
+    ],
+    practicePrompt:
+      'Imagine que você está no aeroporto ou no trabalho. Escreva ou fale uma frase pedindo ajuda usando "Could you help me...":',
+    deck: 'Blocos Essenciais',
+    level: 'A1-A2',
+    repetitions: 0,
+    interval: 0,
+    easeFactor: 2.5,
+    nextReview: Date.now(),
+    status: 'new',
+  },
+  {
     id: 'card-1',
-    word: 'figure out',
-    phonetic: '/ˈfɪɡ.jər aʊt/',
-    translation: 'descobrir / entender / resolver um problema',
+    word: 'figure out how to',
+    phonetic: '/ˈfɪɡ.jər aʊt haʊ tuː/',
+    translation: 'descobrir / entender como fazer algo',
+    usageExplanation:
+      'Muito usado por nativos quando você precisa raciocinar para resolver um problema prático ou entender o funcionamento de algo.',
     example: 'Can you help me figure out how this software works?',
     exampleTranslation: 'Você pode me ajudar a descobrir como este software funciona?',
-    deck: 'Phrasal Verbs',
+    situations: [
+      {
+        context: 'Tecnologia / Trabalho',
+        en: 'We need to figure out how to reduce loading time.',
+        pt: 'Precisamos descobrir como reduzir o tempo de carregamento.',
+      },
+      {
+        context: 'Viagem',
+        en: 'I’m trying to figure out how to buy a subway ticket.',
+        pt: 'Estou tentando descobrir como comprar um bilhete de metrô.',
+      },
+    ],
+    practicePrompt:
+      'O que você está tentando aprender ou resolver ultimamente? Responda usando "figure out":',
+    deck: 'Phrasal Verbs & Chunks',
     level: 'B1-B2',
     repetitions: 0,
     interval: 0,
@@ -492,11 +539,27 @@ export const INITIAL_FLASHCARDS = [
   },
   {
     id: 'card-2',
-    word: 'by the way',
-    phonetic: '/baɪ ðə weɪ/',
-    translation: 'a propósito / aliás',
+    word: 'By the way, did you...?',
+    phonetic: '/baɪ ðə weɪ dɪd juː/',
+    translation: 'A propósito / Aliás, você...?',
+    usageExplanation:
+      'Bloco perfeito para introduzir um assunto novo ou lembrar de uma pergunta no meio de uma conversa sem perder a naturalidade.',
     example: 'By the way, did you book the hotel for our trip?',
     exampleTranslation: 'A propósito, você reservou o hotel para a nossa viagem?',
+    situations: [
+      {
+        context: 'Reunião de equipe',
+        en: 'By the way, did you receive the updated report?',
+        pt: 'A propósito, você recebeu o relatório atualizado?',
+      },
+      {
+        context: 'Conversa entre amigos',
+        en: 'By the way, what time does the movie start?',
+        pt: 'Aliás, a que horas começa o filme?',
+      },
+    ],
+    practicePrompt:
+      'Faça uma pergunta casual para um amigo ou colega começando com "By the way...":',
     deck: 'Conversação & Viagem',
     level: 'A1-A2',
     repetitions: 0,
@@ -507,11 +570,22 @@ export const INITIAL_FLASHCARDS = [
   },
   {
     id: 'card-3',
-    word: 'keep in the loop',
-    phonetic: '/kiːp ɪn ðə luːp/',
-    translation: 'manter informado / por dentro do assunto',
+    word: 'Please keep me in the loop',
+    phonetic: '/pliːz kiːp miː ɪn ðə luːp/',
+    translation: 'Por favor, me mantenha informado / por dentro',
+    usageExplanation:
+      'Expressão idiomática indispensável no ambiente profissional para pedir atualizações sobre um projeto ou decisão.',
     example: 'Please keep me in the loop about the client’s feedback.',
     exampleTranslation: 'Por favor, me mantenha informado sobre o feedback do cliente.',
+    situations: [
+      {
+        context: 'E-mail ou Slack corporativo',
+        en: 'Keep the team in the loop if the deadline changes.',
+        pt: 'Mantenha a equipe informada caso o prazo mude.',
+      },
+    ],
+    practicePrompt:
+      'Peça para um colega te manter atualizado sobre um projeto usando "keep me in the loop":',
     deck: 'Carreira & Tech',
     level: 'B1-B2',
     repetitions: 0,
@@ -522,11 +596,22 @@ export const INITIAL_FLASHCARDS = [
   },
   {
     id: 'card-4',
-    word: 'actually',
-    phonetic: '/ˈæk.tʃu.ə.li/',
-    translation: 'na verdade / de fato (Falso cognato: não é "atualmente"!)',
+    word: 'It was actually quite...',
+    phonetic: '/ɪt wɒz ˈæk.tʃu.ə.li kwaɪt/',
+    translation: 'Na verdade foi bem... (quebrando uma expectativa)',
+    usageExplanation:
+      'Atenção ao falso cognato: "actually" significa "na verdade / de fato" (para dizer "atualmente", use "currently" ou "nowadays").',
     example: 'I thought the test would be hard, but it was actually quite easy.',
     exampleTranslation: 'Achei que o teste seria difícil, mas na verdade foi bem fácil.',
+    situations: [
+      {
+        context: 'Contando uma experiência',
+        en: 'The hotel looked small online, but it was actually quite spacious.',
+        pt: 'O hotel parecia pequeno online, mas na verdade era bem espaçoso.',
+      },
+    ],
+    practicePrompt:
+      'Conte algo que te surpreendeu positivamente usando "actually":',
     deck: 'Falsos Cognatos',
     level: 'A1-A2',
     repetitions: 0,
@@ -537,12 +622,28 @@ export const INITIAL_FLASHCARDS = [
   },
   {
     id: 'card-5',
-    word: 'look forward to',
-    phonetic: '/lʊk ˈfɔː.wəd tuː/',
-    translation: 'estar ansioso por / aguardar com expectativa (+ verbo com -ing)',
+    word: 'I’m looking forward to',
+    phonetic: '/aɪm ˈlʊk.ɪŋ ˈfɔː.wəd tuː/',
+    translation: 'Estou ansioso(a) por / Aguardo com expectativa',
+    usageExplanation:
+      'Regra de ouro: após "look forward to", se vier um verbo, ele SEMPRE termina em "-ing" (ex: looking forward to meeting you / traveling).',
     example: 'I’m really looking forward to meeting your team in person.',
     exampleTranslation: 'Estou muito ansioso para conhecer sua equipe pessoalmente.',
-    deck: 'Phrasal Verbs',
+    situations: [
+      {
+        context: 'Final de entrevista ou e-mail',
+        en: 'I look forward to hearing from you soon.',
+        pt: 'Aguardo seu retorno em breve.',
+      },
+      {
+        context: 'Planos de férias',
+        en: 'We are looking forward to visiting London next month.',
+        pt: 'Estamos ansiosos para visitar Londres no mês que vem.',
+      },
+    ],
+    practicePrompt:
+      'Pelo que você está ansioso(a) esta semana ou neste ano? Use "I’m looking forward to...":',
+    deck: 'Phrasal Verbs & Chunks',
     level: 'B1-B2',
     repetitions: 0,
     interval: 0,
@@ -552,12 +653,23 @@ export const INITIAL_FLASHCARDS = [
   },
   {
     id: 'card-6',
-    word: 'postpone / put off',
-    phonetic: '/pəʊstˈpəʊn/ • /pʊt ɒf/',
-    translation: 'adiar / deixar para depois',
+    word: 'had to put off',
+    phonetic: '/hæd tuː pʊt ɒf/',
+    translation: 'tive/tivemos que adiar (deixar para depois)',
+    usageExplanation:
+      'Mais natural na fala cotidiana do que "postpone". Use "put off + substantivo" ou "put off + verbo com -ing".',
     example: 'We had to put off the outdoor event because of the storm.',
     exampleTranslation: 'Tivemos que adiar o evento ao ar livre por causa da tempestade.',
-    deck: 'Phrasal Verbs',
+    situations: [
+      {
+        context: 'Rotina de trabalho',
+        en: 'Let’s not put off this decision any longer.',
+        pt: 'Não vamos adiar mais esta decisão.',
+      },
+    ],
+    practicePrompt:
+      'Crie uma frase dizendo que precisou adiar uma reunião ou viagem usando "put off":',
+    deck: 'Phrasal Verbs & Chunks',
     level: 'B1-B2',
     repetitions: 0,
     interval: 0,
@@ -567,11 +679,22 @@ export const INITIAL_FLASHCARDS = [
   },
   {
     id: 'card-7',
-    word: 'Grab a bite',
-    phonetic: '/ɡræb ə baɪt/',
-    translation: 'comer algo rápido / fazer um lanche',
+    word: 'Let’s grab a bite',
+    phonetic: '/lets ɡræb ə baɪt/',
+    translation: 'Vamos comer algo rápido / fazer um lanche',
+    usageExplanation:
+      'Convite informal e muito comum para almoçar ou lanchar sem formalidade.',
     example: 'Are you hungry? Let’s grab a bite before the flight.',
     exampleTranslation: 'Está com fome? Vamos comer algo rápido antes do voo.',
+    situations: [
+      {
+        context: 'Intervalo do trabalho',
+        en: 'Do you want to grab a bite after the meeting?',
+        pt: 'Quer comer alguma coisa rápida depois da reunião?',
+      },
+    ],
+    practicePrompt:
+      'Convide alguém para lanchar ou tomar café usando "grab a bite" ou "grab a coffee":',
     deck: 'Conversação & Viagem',
     level: 'A1-A2',
     repetitions: 0,
@@ -582,11 +705,22 @@ export const INITIAL_FLASHCARDS = [
   },
   {
     id: 'card-8',
-    word: 'Double-edged sword',
-    phonetic: '/ˌdʌb.əl.edʒd ˈsɔːd/',
-    translation: 'faca de dois gumes (tem lados positivos e negativos)',
+    word: 'can be a double-edged sword',
+    phonetic: '/kæn biː ə ˌdʌb.əl.edʒd ˈsɔːd/',
+    translation: 'pode ser uma faca de dois gumes (tem prós e contras)',
+    usageExplanation:
+      'Excelente bloco avançado para argumentar em entrevistas ou debates quando algo traz vantagens e riscos ao mesmo tempo.',
     example: 'Working from home can be a double-edged sword if you don’t set boundaries.',
     exampleTranslation: 'Trabalhar de casa pode ser uma faca de dois gumes se você não definir limites.',
+    situations: [
+      {
+        context: 'Debate sobre tecnologia',
+        en: 'Social media is a double-edged sword for productivity.',
+        pt: 'As redes sociais são uma faca de dois gumes para a produtividade.',
+      },
+    ],
+    practicePrompt:
+      'Cite algo na tecnologia ou no trabalho que tem lados bons e ruins usando "double-edged sword":',
     deck: 'Expressões Avançadas',
     level: 'C1-C2',
     repetitions: 0,

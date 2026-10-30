@@ -57,7 +57,14 @@ export default function App() {
         if (typeof parsed.dailyGoal === 'number') setDailyGoal(parsed.dailyGoal);
         if (typeof parsed.streak === 'number') setStreak(parsed.streak);
         if (Array.isArray(parsed.flashcards) && parsed.flashcards.length > 0) {
-          setFlashcards(parsed.flashcards);
+          // Preserva o histórico do usuário e enriquece cards padrão com novos metadados de blocos (chunks)
+          const merged = parsed.flashcards.map((savedCard) => {
+            const template = INITIAL_FLASHCARDS.find((t) => t.id === savedCard.id);
+            return template ? { ...template, ...savedCard, usageExplanation: savedCard.usageExplanation || template.usageExplanation, situations: savedCard.situations || template.situations, practicePrompt: savedCard.practicePrompt || template.practicePrompt } : savedCard;
+          });
+          const hasCard0 = merged.some((c) => c.id === 'card-0');
+          const defaultCard0 = INITIAL_FLASHCARDS.find((t) => t.id === 'card-0');
+          setFlashcards(!hasCard0 && defaultCard0 ? [defaultCard0, ...merged] : merged);
         }
         if (Array.isArray(parsed.completedTexts)) {
           setCompletedTexts(parsed.completedTexts);
@@ -170,6 +177,9 @@ export default function App() {
       word: newCardData.word,
       phonetic: newCardData.phonetic || '/.../',
       translation: newCardData.translation,
+      usageExplanation: newCardData.usageExplanation || '',
+      situations: newCardData.situations || [],
+      practicePrompt: newCardData.practicePrompt || '',
       example: newCardData.example || '',
       exampleTranslation: newCardData.exampleTranslation || '',
       deck: newCardData.deck || 'Salvos',
@@ -326,6 +336,8 @@ export default function App() {
             streak={streak}
             flashcards={flashcards}
             completedTexts={completedTexts}
+            onUpdateFlashcard={handleUpdateFlashcard}
+            onAwardXP={handleAwardXP}
           />
         )}
 
