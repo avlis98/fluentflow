@@ -31,6 +31,9 @@ export default function App() {
   const [streak, setStreak] = useState(3);
   const [flashcards, setFlashcards] = useState(INITIAL_FLASHCARDS);
   const [completedTexts, setCompletedTexts] = useState([]);
+  const [customTexts, setCustomTexts] = useState([]);
+  const [preferredAccent, setPreferredAccent] = useState('en-US'); // 'en-US' | 'en-GB' | 'en-AU'
+  const [lastStudyDate, setLastStudyDate] = useState('');
   const [geminiApiKey, setGeminiApiKey] = useState('');
   const [userName, setUserName] = useState('');
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
@@ -73,6 +76,15 @@ export default function App() {
         if (Array.isArray(parsed.completedTexts)) {
           setCompletedTexts(parsed.completedTexts);
         }
+        if (Array.isArray(parsed.customTexts)) {
+          setCustomTexts(parsed.customTexts);
+        }
+        if (typeof parsed.preferredAccent === 'string') {
+          setPreferredAccent(parsed.preferredAccent);
+        }
+        if (typeof parsed.lastStudyDate === 'string') {
+          setLastStudyDate(parsed.lastStudyDate);
+        }
         if (typeof parsed.geminiApiKey === 'string') {
           setGeminiApiKey(parsed.geminiApiKey);
         }
@@ -100,6 +112,9 @@ export default function App() {
           streak,
           flashcards,
           completedTexts,
+          customTexts,
+          preferredAccent,
+          lastStudyDate,
           geminiApiKey,
           userName,
         })
@@ -107,7 +122,18 @@ export default function App() {
     } catch {
       // Ignora erro de escrita
     }
-  }, [xp, dailyGoal, streak, flashcards, completedTexts, geminiApiKey, userName]);
+  }, [
+    xp,
+    dailyGoal,
+    streak,
+    flashcards,
+    completedTexts,
+    customTexts,
+    preferredAccent,
+    lastStudyDate,
+    geminiApiKey,
+    userName,
+  ]);
 
   const showNotification = (message) => {
     setToast(message);
@@ -131,7 +157,17 @@ export default function App() {
 
   const handleExportProgress = () => {
     const dataStr = JSON.stringify(
-      { userName, xp, dailyGoal, streak, flashcards, completedTexts },
+      {
+        userName,
+        xp,
+        dailyGoal,
+        streak,
+        preferredAccent,
+        lastStudyDate,
+        flashcards,
+        completedTexts,
+        customTexts,
+      },
       null,
       2
     );
@@ -158,8 +194,14 @@ export default function App() {
         if (Array.isArray(parsed.flashcards)) setFlashcards(parsed.flashcards);
         if (typeof parsed.xp === 'number') setXp(parsed.xp);
         if (typeof parsed.streak === 'number') setStreak(parsed.streak);
+        if (typeof parsed.preferredAccent === 'string') {
+          setPreferredAccent(parsed.preferredAccent);
+        }
         if (Array.isArray(parsed.completedTexts)) {
           setCompletedTexts(parsed.completedTexts);
+        }
+        if (Array.isArray(parsed.customTexts)) {
+          setCustomTexts(parsed.customTexts);
         }
         showNotification('Progresso e flashcards restaurados com sucesso!');
         setShowSettings(false);
@@ -171,10 +213,32 @@ export default function App() {
   };
 
   const handleAwardXP = (amount, customMessage) => {
-    setXp((prev) => prev + amount);
+    if (amount > 0) {
+      setXp((prev) => prev + amount);
+      const todayStr = new Date().toISOString().slice(0, 10);
+      if (lastStudyDate !== todayStr) {
+        const yesterday = new Date(Date.now() - 86400000)
+          .toISOString()
+          .slice(0, 10);
+        if (lastStudyDate === yesterday) {
+          setStreak((prev) => prev + 1);
+        }
+        setLastStudyDate(todayStr);
+      }
+    }
     if (customMessage) {
       showNotification(customMessage);
     }
+  };
+
+  const handleAddCustomText = (newTextObj) => {
+    setCustomTexts((prev) => [newTextObj, ...prev]);
+    handleAwardXP(15, `Texto "${newTextObj.title}" criado na sua biblioteca! (+15 XP)`);
+  };
+
+  const handleDeleteCustomText = (textId) => {
+    setCustomTexts((prev) => prev.filter((t) => t.id !== textId));
+    showNotification('Texto personalizado removido.');
   };
 
   const handleAddFlashcard = (newCardData) => {
@@ -350,6 +414,8 @@ export default function App() {
               setTempNameInput(userName);
               setShowWelcomeModal(true);
             }}
+            preferredAccent={preferredAccent}
+            onChangeAccent={setPreferredAccent}
             selectedLevel={selectedLevel}
             onSelectLevel={setSelectedLevel}
             onNavigate={setActiveTab}
@@ -358,7 +424,9 @@ export default function App() {
             streak={streak}
             flashcards={flashcards}
             completedTexts={completedTexts}
+            customTexts={customTexts}
             onUpdateFlashcard={handleUpdateFlashcard}
+            onAddFlashcard={handleAddFlashcard}
             onAwardXP={handleAwardXP}
           />
         )}
@@ -366,16 +434,23 @@ export default function App() {
         {activeTab === 'reader' && (
           <InteractiveReader
             selectedLevel={selectedLevel}
+            preferredAccent={preferredAccent}
+            onChangeAccent={setPreferredAccent}
             flashcards={flashcards}
             onAddFlashcard={handleAddFlashcard}
             onAwardXP={handleAwardXP}
             completedTexts={completedTexts}
             onCompleteText={handleCompleteText}
+            customTexts={customTexts}
+            onAddCustomText={handleAddCustomText}
+            onDeleteCustomText={handleDeleteCustomText}
+            geminiApiKey={geminiApiKey}
           />
         )}
 
         {activeTab === 'flashcards' && (
           <FlashcardsModule
+            preferredAccent={preferredAccent}
             flashcards={flashcards}
             onUpdateFlashcard={handleUpdateFlashcard}
             onAddFlashcard={handleAddFlashcard}
@@ -386,6 +461,7 @@ export default function App() {
         {activeTab === 'roleplay' && (
           <RoleplayModule
             selectedLevel={selectedLevel}
+            preferredAccent={preferredAccent}
             onAddFlashcard={handleAddFlashcard}
             onAwardXP={handleAwardXP}
             geminiApiKey={geminiApiKey}
@@ -513,6 +589,21 @@ export default function App() {
                   <option value={60}>Casual (60 XP / ~5 min)</option>
                   <option value={120}>Regular (120 XP / ~15 min)</option>
                   <option value={250}>Intensivo (250 XP / ~30 min)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  Sotaque Padrão de Voz & Reconhecimento
+                </label>
+                <select
+                  value={preferredAccent}
+                  onChange={(e) => setPreferredAccent(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white"
+                >
+                  <option value="en-US">🇺🇸 Inglês Americano (en-US)</option>
+                  <option value="en-GB">🇬🇧 Inglês Britânico (en-GB)</option>
+                  <option value="en-AU">🇦🇺 Inglês Australiano (en-AU)</option>
                 </select>
               </div>
 

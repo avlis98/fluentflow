@@ -30,6 +30,7 @@ import {
 } from '../utils/srs';
 
 export default function FlashcardsModule({
+  preferredAccent = 'en-US',
   flashcards,
   onUpdateFlashcard,
   onAddFlashcard,
@@ -150,7 +151,7 @@ export default function FlashcardsModule({
     }
 
     const recognition = createSpeechRecognition({
-      lang: 'en-US',
+      lang: preferredAccent,
       onResult: (transcript, isFinal) => {
         targetSetter(transcript);
         if (isFinal && onFinalCallback) {
@@ -253,7 +254,7 @@ export default function FlashcardsModule({
     setShadowResult(null);
 
     const recognition = createSpeechRecognition({
-      lang: 'en-US',
+      lang: preferredAccent,
       onResult: (transcript) => {
         setShadowTranscript(transcript);
         const result = evaluatePronunciation(shadowSentence, transcript);

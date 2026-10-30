@@ -23,6 +23,7 @@ import {
 
 export default function RoleplayModule({
   selectedLevel,
+  preferredAccent = 'en-US',
   onAddFlashcard,
   onAwardXP,
   geminiApiKey,
@@ -88,7 +89,7 @@ export default function RoleplayModule({
     }
 
     const recognition = createSpeechRecognition({
-      lang: scenario.accent || 'en-US',
+      lang: preferredAccent || scenario.accent || 'en-US',
       onResult: (transcript) => {
         setInputText(transcript);
       },
@@ -121,7 +122,7 @@ export default function RoleplayModule({
 
     setShadowTargetMsgId(msgId);
     const recognition = createSpeechRecognition({
-      lang: scenario.accent || 'en-US',
+      lang: preferredAccent || scenario.accent || 'en-US',
       onResult: (transcript) => {
         const res = evaluatePronunciation(targetSentence, transcript);
         setShadowResults((prev) => ({
