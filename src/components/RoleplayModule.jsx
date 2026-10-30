@@ -378,28 +378,28 @@ Respond in valid JSON with keys:
       </div>
 
       {/* Coluna Direita: Simulador de Conversa + Feedback */}
-      <div className="lg:col-span-8 flex flex-col bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden min-h-[600px]">
+      <div className="lg:col-span-8 flex flex-col bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden min-h-[480px] sm:min-h-[600px]">
         {/* Topo do Chat */}
-        <div className="p-4 border-b border-slate-800 bg-slate-950/60 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-2xl">
+        <div className="p-3.5 sm:p-4 border-b border-slate-800 bg-slate-950/60 flex flex-wrap items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-xl sm:text-2xl shrink-0">
               {scenario.avatar}
             </div>
-            <div>
-              <h2 className="text-base font-bold text-white">
+            <div className="min-w-0">
+              <h2 className="text-sm sm:text-base font-bold text-white truncate">
                 {scenario.title}
               </h2>
-              <p className="text-xs text-indigo-300">{scenario.role}</p>
+              <p className="text-xs text-indigo-300 truncate">{scenario.role}</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <button
               onClick={() => setShowTranslations((prev) => !prev)}
-              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700"
+              className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 border border-slate-700"
             >
-              <Languages className="w-4 h-4 text-indigo-400" />
-              {showTranslations ? 'Ocultar Tradução' : 'Ver Tradução'}
+              <Languages className="w-4 h-4 text-indigo-400 shrink-0" />
+              <span>{showTranslations ? 'Ocultar PT' : 'Ver PT'}</span>
             </button>
             <button
               onClick={() => initScenario(scenario)}
@@ -412,7 +412,7 @@ Respond in valid JSON with keys:
         </div>
 
         {/* Histórico de Mensagens */}
-        <div className="flex-1 p-5 space-y-5 overflow-y-auto max-h-[420px]">
+        <div className="flex-1 p-3.5 sm:p-5 space-y-4 sm:space-y-5 overflow-y-auto max-h-[52dvh] sm:max-h-[420px]">
           {messages.map((msg) => {
             if (msg.sender === 'ai') {
               return (
@@ -572,14 +572,14 @@ Respond in valid JSON with keys:
 
         {/* Barra de Dica Gradual (Incentiva Recuperação Ativa antes de revelar) */}
         {currentHint && (
-          <div className="px-4 py-2.5 bg-indigo-950/40 border-t border-indigo-500/20 flex items-center justify-between gap-2 text-xs text-indigo-200">
-            <div className="flex items-center gap-2 truncate">
-              <Lightbulb className="w-4 h-4 text-amber-400 shrink-0" />
+          <div className="px-3.5 sm:px-4 py-2.5 bg-indigo-950/40 border-t border-indigo-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-indigo-200">
+            <div className="flex items-start sm:items-center gap-2 min-w-0">
+              <Lightbulb className="w-4 h-4 text-amber-400 shrink-0 mt-0.5 sm:mt-0" />
               {revealHintText ? (
-                <span className="truncate">{currentHint}</span>
+                <span className="leading-snug break-words">{currentHint}</span>
               ) : (
-                <span className="text-slate-300">
-                  Tente formular sua resposta primeiro! Precisa de ajuda para destravar?
+                <span className="text-slate-300 leading-snug">
+                  Tente formular sua resposta primeiro! Precisa de ajuda?
                 </span>
               )}
             </div>
@@ -587,7 +587,7 @@ Respond in valid JSON with keys:
               <button
                 type="button"
                 onClick={() => setRevealHintText(true)}
-                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 font-semibold shrink-0 transition border border-slate-700"
+                className="w-full sm:w-auto px-3 py-1.5 sm:py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 font-semibold shrink-0 transition border border-slate-700 text-center"
               >
                 Ver Pista de Bloco
               </button>
@@ -600,7 +600,7 @@ Respond in valid JSON with keys:
                     setInputText(match[1]);
                   }
                 }}
-                className="px-2.5 py-1 rounded-lg bg-indigo-600/40 hover:bg-indigo-600 text-white font-semibold shrink-0 transition"
+                className="w-full sm:w-auto px-3 py-1.5 sm:py-1 rounded-lg bg-indigo-600/40 hover:bg-indigo-600 text-white font-semibold shrink-0 transition text-center"
               >
                 Preencher Sugestão
               </button>
@@ -611,12 +611,12 @@ Respond in valid JSON with keys:
         {/* Input de Texto e Microfone */}
         <form
           onSubmit={handleSendMessage}
-          className="p-4 bg-slate-950 border-t border-slate-800 flex items-center gap-2.5"
+          className="p-3 sm:p-4 bg-slate-950 border-t border-slate-800 flex items-center gap-2"
         >
           <button
             type="button"
             onClick={handleToggleMic}
-            className={`p-3.5 rounded-xl font-semibold transition flex items-center justify-center shrink-0 ${
+            className={`p-3 sm:p-3.5 rounded-xl font-semibold transition flex items-center justify-center shrink-0 ${
               isListening
                 ? 'bg-rose-600 text-white animate-pulse shadow-lg shadow-rose-600/40'
                 : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
@@ -640,16 +640,16 @@ Respond in valid JSON with keys:
             onChange={(e) => setInputText(e.target.value)}
             placeholder={
               isListening
-                ? '🎙️ Ouvindo sua voz em inglês...'
-                : 'Digite ou fale sua resposta em inglês...'
+                ? '🎙️ Ouvindo sua voz...'
+                : 'Digite ou fale em inglês...'
             }
-            className="flex-1 px-4 py-3 rounded-xl bg-slate-900 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+            className="min-w-0 flex-1 px-3.5 sm:px-4 py-3 rounded-xl bg-slate-900 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
           />
 
           <button
             type="submit"
             disabled={!inputText.trim() || isLoadingAI}
-            className="px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white font-bold text-sm flex items-center gap-2 transition shadow-lg shadow-indigo-600/20"
+            className="px-4 sm:px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white font-bold text-sm flex items-center gap-2 transition shadow-lg shadow-indigo-600/20 shrink-0"
           >
             <Send className="w-4 h-4" />
             <span className="hidden sm:inline">Enviar</span>

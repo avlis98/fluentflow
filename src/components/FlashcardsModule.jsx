@@ -324,20 +324,20 @@ export default function FlashcardsModule({
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full lg:w-auto">
           <button
             onClick={() => {
               setMode('srs');
               resetCardInteractions();
             }}
-            className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition ${
+            className={`px-3 py-2.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
               mode === 'srs'
                 ? 'bg-indigo-600 text-white shadow'
                 : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
             }`}
           >
-            <Brain className="w-4 h-4" />
-            Revisão Espaçada (Chunks)
+            <Brain className="w-4 h-4 shrink-0" />
+            <span className="truncate">Revisão (Chunks)</span>
           </button>
 
           <button
@@ -345,14 +345,14 @@ export default function FlashcardsModule({
               setMode('recall');
               resetCardInteractions();
             }}
-            className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition ${
+            className={`px-3 py-2.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
               mode === 'recall'
                 ? 'bg-indigo-600 text-white shadow'
                 : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
             }`}
           >
-            <BookOpenCheck className="w-4 h-4" />
-            Recuperação Ativa
+            <BookOpenCheck className="w-4 h-4 shrink-0" />
+            <span className="truncate">Recuperação Ativa</span>
           </button>
 
           <button
@@ -360,39 +360,39 @@ export default function FlashcardsModule({
               setMode('shadowing');
               resetCardInteractions();
             }}
-            className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition ${
+            className={`px-3 py-2.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
               mode === 'shadowing'
                 ? 'bg-indigo-600 text-white shadow'
                 : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
             }`}
           >
-            <AudioWaveform className="w-4 h-4" />
-            Shadowing (Pronúncia)
+            <AudioWaveform className="w-4 h-4 shrink-0" />
+            <span className="truncate">Shadowing</span>
           </button>
 
           <button
             onClick={() => setMode('list')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition ${
+            className={`px-3 py-2.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
               mode === 'list'
                 ? 'bg-indigo-600 text-white shadow'
                 : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
             }`}
           >
-            Biblioteca ({baseDeckCards.length})
+            <span className="truncate">Biblioteca ({baseDeckCards.length})</span>
           </button>
 
           <button
             onClick={() => setShowAddModal(true)}
-            className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1.5 transition shadow-lg shadow-emerald-600/20"
+            className="col-span-2 sm:col-span-1 px-3.5 py-2.5 sm:py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-1.5 transition shadow-lg shadow-emerald-600/20"
           >
-            <Plus className="w-4 h-4" />
-            Novo Bloco
+            <Plus className="w-4 h-4 shrink-0" />
+            <span>Novo Bloco</span>
           </button>
         </div>
       </div>
 
       {/* Filtro de Decks */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1">
+      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
         {decks.map((d) => (
           <button
             key={d}
@@ -460,11 +460,11 @@ export default function FlashcardsModule({
                 {/* Cartão de Bloco de Linguagem */}
                 <div
                   onClick={() => setIsFlipped((prev) => !prev)}
-                  className="cursor-pointer bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/60 border-2 border-slate-800 hover:border-indigo-500/60 rounded-3xl p-7 sm:p-9 min-h-[340px] flex flex-col justify-between transition-all shadow-2xl relative"
+                  className="cursor-pointer bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/60 border-2 border-slate-800 hover:border-indigo-500/60 rounded-3xl p-5 sm:p-9 min-h-[300px] sm:min-h-[340px] flex flex-col justify-between transition-all shadow-2xl relative"
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="px-3 py-1 rounded-full text-xs font-bold bg-slate-800 text-indigo-300 border border-slate-700">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                      <span className="px-2.5 sm:px-3 py-1 rounded-full text-[11px] sm:text-xs font-bold bg-slate-800 text-indigo-300 border border-slate-700">
                         {currentCard.level} • {currentCard.deck}
                       </span>
                       {currentCard.status === 'relearning' && (
@@ -474,7 +474,7 @@ export default function FlashcardsModule({
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -485,7 +485,7 @@ export default function FlashcardsModule({
                             { rate: 0.75 }
                           );
                         }}
-                        className="px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700"
+                        className="px-2 sm:px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700"
                         title="Ouvir devagar (0.75x)"
                       >
                         🐢 0.75x
@@ -500,7 +500,7 @@ export default function FlashcardsModule({
                             { rate: 0.95 }
                           );
                         }}
-                        className="p-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white transition shadow-lg shadow-indigo-600/30"
+                        className="p-2.5 sm:p-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white transition shadow-lg shadow-indigo-600/30"
                         title="Ouvir pronúncia natural"
                       >
                         <Volume2 className="w-5 h-5" />
@@ -509,11 +509,11 @@ export default function FlashcardsModule({
                   </div>
 
                   {!isFlipped ? (
-                    <div className="text-center my-8 space-y-3">
+                    <div className="text-center my-6 sm:my-8 space-y-3">
                       <p className="text-xs uppercase tracking-widest text-indigo-400 font-semibold">
                         Bloco de Linguagem / Expressão
                       </p>
-                      <h3 className="text-3xl sm:text-4xl font-extrabold text-white">
+                      <h3 className="text-2xl sm:text-4xl font-extrabold text-white break-words">
                         “{currentCard.word}”
                       </h3>
                       <p className="text-sm font-mono text-slate-400">
@@ -637,11 +637,11 @@ export default function FlashcardsModule({
                             value={personalSentence}
                             onChange={(e) => setPersonalSentence(e.target.value)}
                             placeholder={`Ex: ${currentCard.example}`}
-                            className="flex-1 px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white"
+                            className="min-w-0 flex-1 px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white"
                           />
                           <button
                             type="submit"
-                            className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-1"
+                            className="px-3 sm:px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-1 shrink-0"
                           >
                             <Send className="w-3.5 h-3.5" /> Testar
                           </button>
@@ -726,13 +726,13 @@ export default function FlashcardsModule({
 
       {/* MODO 2: RECUPERAÇÃO ATIVA DA MEMÓRIA (Item 2.C) */}
       {mode === 'recall' && currentCard && (
-        <div className="max-w-2xl mx-auto bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6">
+        <div className="max-w-2xl mx-auto bg-slate-900/90 border border-slate-800 rounded-3xl p-4 sm:p-8 space-y-5 sm:space-y-6">
           {/* Seletor de tipo de estímulo de recuperação ativa */}
-          <div className="flex flex-wrap items-center justify-between gap-2 pb-4 border-b border-slate-800">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-4 border-b border-slate-800">
             <span className="text-xs font-bold uppercase tracking-wider text-indigo-400">
               Tipo de Recuperação Ativa:
             </span>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-1.5 w-full sm:w-auto">
               {[
                 { id: 'pt-to-en', label: '🇧🇷 Tradução → Inglês' },
                 { id: 'audio', label: '🎧 Escuta Cega (Áudio)' },
@@ -745,7 +745,7 @@ export default function FlashcardsModule({
                     setRecallType(t.id);
                     resetCardInteractions();
                   }}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                  className={`px-2.5 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs font-semibold transition text-center ${
                     recallType === t.id
                       ? 'bg-indigo-600 text-white'
                       : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
@@ -866,39 +866,39 @@ export default function FlashcardsModule({
                 placeholder={
                   isRecordingRecall
                     ? '🎙️ Fale sua resposta em inglês...'
-                    : 'Digite ou fale no microfone antes de revelar...'
+                    : 'Digite ou fale no microfone...'
                 }
-                className="flex-1 px-4 py-3.5 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-base font-semibold"
+                className="min-w-0 flex-1 px-3.5 sm:px-4 py-3.5 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-sm sm:text-base font-semibold"
               />
             </div>
 
             {!recallFeedback ? (
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div className="grid grid-cols-2 sm:flex items-center gap-2 w-full sm:w-auto">
                   <button
                     type="button"
                     disabled={hintLevel >= 3}
                     onClick={() => setHintLevel((prev) => Math.min(3, prev + 1))}
-                    className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-amber-300 text-xs font-semibold flex items-center gap-1.5 border border-slate-700"
+                    className="px-3 sm:px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-amber-300 text-xs font-semibold flex items-center justify-center gap-1.5 border border-slate-700"
                   >
-                    <Lightbulb className="w-4 h-4" />
-                    Pedir Pista ({hintLevel}/3)
+                    <Lightbulb className="w-4 h-4 shrink-0" />
+                    <span>Pista ({hintLevel}/3)</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={handleRevealWithoutAttempt}
-                    className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1.5 border border-slate-700"
+                    className="px-3 sm:px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center justify-center gap-1.5 border border-slate-700"
                   >
-                    <Eye className="w-4 h-4" />
-                    Revelar Resposta
+                    <Eye className="w-4 h-4 shrink-0" />
+                    <span>Revelar</span>
                   </button>
                 </div>
 
                 <button
                   type="submit"
                   disabled={!typedAnswer.trim()}
-                  className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-bold text-sm transition shadow-lg shadow-emerald-600/20"
+                  className="w-full sm:w-auto px-6 py-3 sm:py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-bold text-sm transition shadow-lg shadow-emerald-600/20"
                 >
                   Confirmar Tentativa
                 </button>
@@ -955,11 +955,11 @@ export default function FlashcardsModule({
 
       {/* MODO 3: TÉCNICA SHADOWING (Item 2.D) */}
       {mode === 'shadowing' && currentCard && (
-        <div className="max-w-2xl mx-auto bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-2 pb-4 border-b border-slate-800">
+        <div className="max-w-2xl mx-auto bg-slate-900/90 border border-slate-800 rounded-3xl p-4 sm:p-8 space-y-5 sm:space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-4 border-b border-slate-800">
             <div>
               <span className="text-xs font-bold uppercase tracking-wider text-indigo-400 flex items-center gap-1.5">
-                <AudioWaveform className="w-4 h-4" />
+                <AudioWaveform className="w-4 h-4 shrink-0" />
                 Técnica Shadowing (Escutar, Imitar e Comparar)
               </span>
               <p className="text-xs text-slate-400 mt-0.5">
@@ -967,13 +967,13 @@ export default function FlashcardsModule({
               </p>
             </div>
 
-            <div className="flex gap-1.5">
+            <div className="grid grid-cols-2 sm:flex gap-1.5 w-full sm:w-auto">
               <button
                 onClick={() => {
                   setShadowTargetType('example');
                   setShadowResult(null);
                 }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold ${
+                className={`px-3 py-2 sm:py-1.5 rounded-xl text-xs font-semibold text-center ${
                   shadowTargetType === 'example'
                     ? 'bg-indigo-600 text-white'
                     : 'bg-slate-800 text-slate-300'
@@ -986,7 +986,7 @@ export default function FlashcardsModule({
                   setShadowTargetType('chunk');
                   setShadowResult(null);
                 }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold ${
+                className={`px-3 py-2 sm:py-1.5 rounded-xl text-xs font-semibold text-center ${
                   shadowTargetType === 'chunk'
                     ? 'bg-indigo-600 text-white'
                     : 'bg-slate-800 text-slate-300'
@@ -1189,8 +1189,8 @@ export default function FlashcardsModule({
 
       {/* MODAL PARA ADICIONAR NOVO BLOCO DE LINGUAGEM */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4">
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full max-h-[90dvh] overflow-y-auto p-5 sm:p-6 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-indigo-400" />

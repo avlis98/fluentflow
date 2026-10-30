@@ -15,6 +15,7 @@ import {
   Mic,
   MicOff,
   AudioWaveform,
+  X,
 } from 'lucide-react';
 import { INTERACTIVE_TEXTS, COMMON_DICTIONARY } from '../data/content';
 import {
@@ -267,8 +268,8 @@ export default function InteractiveReader({
           </div>
         </div>
 
-        {/* Painel do Bloco/Palavra Clicada */}
-        <div className="bg-gradient-to-br from-indigo-950/70 via-slate-900 to-slate-900 border border-indigo-500/30 rounded-2xl p-5 sticky top-24">
+        {/* Painel do Bloco/Palavra Clicada (Desktop Sidebar) */}
+        <div className="hidden lg:block bg-gradient-to-br from-indigo-950/70 via-slate-900 to-slate-900 border border-indigo-500/30 rounded-2xl p-5 sticky top-24">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-semibold uppercase tracking-wider text-indigo-400 flex items-center gap-1.5">
               <Sparkles className="w-4 h-4" />
@@ -372,7 +373,7 @@ export default function InteractiveReader({
 
       {/* Área Principal de Leitura, Áudio e Shadowing */}
       <div className="lg:col-span-8 space-y-6">
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6">
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-6">
           {/* Cabeçalho e controles de áudio */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-800">
             <div>
@@ -384,16 +385,16 @@ export default function InteractiveReader({
                   • {activeText.category} • ⏱️ {activeText.duration}
                 </span>
               </div>
-              <h1 className="text-2xl font-extrabold text-white">
+              <h1 className="text-xl sm:text-2xl font-extrabold text-white">
                 {activeText.coverEmoji} {activeText.title}
               </h1>
-              <p className="text-sm text-slate-400">{activeText.subtitle}</p>
+              <p className="text-xs sm:text-sm text-slate-400">{activeText.subtitle}</p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="grid grid-cols-2 sm:flex items-center gap-2 w-full sm:w-auto">
               <button
                 onClick={handlePlayAll}
-                className={`px-4 py-2.5 rounded-xl font-semibold text-sm flex items-center gap-2 transition shadow-lg ${
+                className={`px-3 sm:px-4 py-2.5 rounded-xl font-semibold text-xs sm:text-sm flex items-center justify-center gap-1.5 sm:gap-2 transition shadow-lg ${
                   playingParagraphIdx !== null
                     ? 'bg-rose-600 hover:bg-rose-500 text-white'
                     : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/20'
@@ -401,31 +402,31 @@ export default function InteractiveReader({
               >
                 {playingParagraphIdx !== null ? (
                   <>
-                    <Square className="w-4 h-4 fill-current" />
-                    Parar Áudio
+                    <Square className="w-4 h-4 fill-current shrink-0" />
+                    <span>Parar Áudio</span>
                   </>
                 ) : (
                   <>
-                    <Volume2 className="w-4 h-4" />
-                    Ouvir Texto Completo
+                    <Volume2 className="w-4 h-4 shrink-0" />
+                    <span>Ouvir Tudo</span>
                   </>
                 )}
               </button>
 
               <button
                 onClick={() => setShowTranslations((prev) => !prev)}
-                className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition text-xs font-medium flex items-center gap-1.5"
+                className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition text-xs font-medium flex items-center justify-center gap-1.5"
                 title="Mostrar/ocultar tradução linha a linha"
               >
                 {showTranslations ? (
                   <>
-                    <EyeOff className="w-4 h-4 text-indigo-400" />
-                    Ocultar PT
+                    <EyeOff className="w-4 h-4 text-indigo-400 shrink-0" />
+                    <span>Ocultar PT</span>
                   </>
                 ) : (
                   <>
-                    <Eye className="w-4 h-4 text-indigo-400" />
-                    Mostrar PT
+                    <Eye className="w-4 h-4 text-indigo-400 shrink-0" />
+                    <span>Mostrar PT</span>
                   </>
                 )}
               </button>
@@ -720,6 +721,72 @@ export default function InteractiveReader({
           </div>
         )}
       </div>
+
+      {/* Bottom Sheet Flutuante no Mobile quando o usuário clica em uma palavra */}
+      {selectedWordInfo && (
+        <div className="lg:hidden fixed bottom-16 inset-x-3 z-40 bg-slate-900/95 backdrop-blur-md border border-indigo-500/50 rounded-2xl p-4 shadow-2xl space-y-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-extrabold text-white truncate">
+                  “{selectedWordInfo.word}”
+                </h3>
+                <span className="text-xs font-mono text-indigo-300 shrink-0">
+                  {selectedWordInfo.phonetic}
+                </span>
+              </div>
+              <p className="text-sm font-semibold text-emerald-300 mt-0.5">
+                {selectedWordInfo.translation}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                onClick={() =>
+                  speakText(selectedWordInfo.word, { rate: 0.9, accent })
+                }
+                className="p-2 rounded-xl bg-indigo-600 text-white"
+                title="Ouvir pronúncia"
+              >
+                <Volume2 className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setSelectedWordInfo(null)}
+                className="p-2 rounded-xl bg-slate-800 text-slate-300"
+                title="Fechar"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          <p className="text-xs text-slate-300 italic bg-slate-950/70 p-2 rounded-lg border border-slate-800 line-clamp-2">
+            "{selectedWordInfo.example}"
+          </p>
+
+          <button
+            onClick={handleSaveSelectedWord}
+            disabled={isWordInDeck(selectedWordInfo.word)}
+            className={`w-full py-2.5 px-4 rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition ${
+              isWordInDeck(selectedWordInfo.word)
+                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg'
+            }`}
+          >
+            {isWordInDeck(selectedWordInfo.word) ? (
+              <>
+                <Check className="w-4 h-4" />
+                Já está nos seus Flashcards
+              </>
+            ) : (
+              <>
+                <Plus className="w-4 h-4" />
+                Salvar Bloco nos Flashcards (+10 XP)
+              </>
+            )}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

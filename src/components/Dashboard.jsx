@@ -84,26 +84,28 @@ export default function Dashboard({
             </p>
 
             {/* Seletor de Nível */}
-            <div className="pt-2 flex flex-wrap items-center gap-2">
-              <span className="text-xs font-semibold text-slate-400 mr-1">
+            <div className="pt-2 space-y-1.5 sm:space-y-0 sm:flex sm:flex-wrap sm:items-center gap-2">
+              <span className="text-xs font-semibold text-slate-400 block sm:inline mr-1">
                 Filtrar por nível:
               </span>
-              {LEVELS.map((lvl) => {
-                const active = selectedLevel === lvl.id;
-                return (
-                  <button
-                    key={lvl.id}
-                    onClick={() => onSelectLevel(lvl.id)}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition border ${
-                      active
-                        ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg shadow-indigo-600/30'
-                        : 'bg-slate-900/90 border-slate-800 text-slate-300 hover:border-slate-700'
-                    }`}
-                  >
-                    {lvl.label} ({lvl.badge})
-                  </button>
-                );
-              })}
+              <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 w-full sm:w-auto">
+                {LEVELS.map((lvl) => {
+                  const active = selectedLevel === lvl.id;
+                  return (
+                    <button
+                      key={lvl.id}
+                      onClick={() => onSelectLevel(lvl.id)}
+                      className={`px-3 py-2 sm:px-3.5 sm:py-1.5 rounded-xl text-xs font-bold transition border text-center ${
+                        active
+                          ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg shadow-indigo-600/30'
+                          : 'bg-slate-900/90 border-slate-800 text-slate-300 hover:border-slate-700'
+                      }`}
+                    >
+                      {lvl.label} ({lvl.badge})
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
@@ -206,49 +208,49 @@ export default function Dashboard({
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <div className="w-full lg:w-auto shrink-0">
             {!quickRevealed ? (
-              <>
+              <div className="grid grid-cols-2 sm:flex items-center gap-2 w-full">
                 <button
                   onClick={() =>
                     setQuickHintLevel((prev) => Math.min(3, prev + 1))
                   }
-                  className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs font-semibold flex items-center gap-1.5 border border-slate-700"
+                  className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs font-semibold flex items-center justify-center gap-1.5 border border-slate-700"
                 >
-                  <Lightbulb className="w-3.5 h-3.5" />
-                  Pista ({quickHintLevel}/3)
+                  <Lightbulb className="w-3.5 h-3.5 shrink-0" />
+                  <span>Pista ({quickHintLevel}/3)</span>
                 </button>
                 <button
                   onClick={() => {
                     setQuickRevealed(true);
                     speakText(urgentCard.word);
                   }}
-                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold"
+                  className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold text-center"
                 >
                   Conferir Resposta
                 </button>
-              </>
+              </div>
             ) : (
-              <>
+              <div className="grid grid-cols-3 sm:flex items-center gap-2 w-full">
                 <button
                   onClick={() => handleQuickRate(0)}
-                  className="px-3 py-2 rounded-xl bg-rose-950/80 hover:bg-rose-900 border border-rose-500/40 text-rose-200 text-xs font-bold"
+                  className="px-2.5 py-2.5 rounded-xl bg-rose-950/80 hover:bg-rose-900 border border-rose-500/40 text-rose-200 text-xs font-bold text-center"
                 >
                   Esqueci
                 </button>
                 <button
                   onClick={() => handleQuickRate(2)}
-                  className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold"
+                  className="px-2.5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold text-center"
                 >
-                  Lembrei Bem (+10 XP)
+                  Lembrei (+10)
                 </button>
                 <button
                   onClick={() => handleQuickRate(3)}
-                  className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold"
+                  className="px-2.5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold text-center"
                 >
                   Já Domino
                 </button>
-              </>
+              </div>
             )}
           </div>
         </div>

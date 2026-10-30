@@ -211,36 +211,37 @@ export default function App() {
   };
 
   const navItems = [
-    { id: 'dashboard', label: 'Início', icon: LayoutDashboard },
-    { id: 'reader', label: 'Textos & Músicas', icon: BookOpen },
+    { id: 'dashboard', label: 'Início', shortLabel: 'Início', icon: LayoutDashboard },
+    { id: 'reader', label: 'Textos & Músicas', shortLabel: 'Leitura', icon: BookOpen },
     {
       id: 'flashcards',
       label: 'Flashcards',
+      shortLabel: 'Blocos',
       icon: Layers,
       badge: flashcards.filter((c) => (c.nextReview || 0) <= Date.now()).length,
     },
-    { id: 'roleplay', label: 'Roleplay IA', icon: MessageSquare },
+    { id: 'roleplay', label: 'Roleplay IA', shortLabel: 'Roleplay', icon: MessageSquare },
   ];
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col pb-20 md:pb-10">
+    <div className="min-h-screen w-full overflow-x-hidden bg-slate-950 text-slate-100 flex flex-col pb-24 md:pb-10">
       {/* Header Principal */}
       <header className="sticky top-0 z-40 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-2">
           {/* Logo */}
           <button
             onClick={() => setActiveTab('dashboard')}
-            className="flex items-center gap-2.5 text-left"
+            className="flex items-center gap-2 text-left min-w-0 shrink-0"
           >
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-emerald-500 flex items-center justify-center font-black text-white text-lg shadow-lg shadow-indigo-600/30">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-gradient-to-br from-indigo-500 to-emerald-500 flex items-center justify-center font-black text-white text-base sm:text-lg shadow-lg shadow-indigo-600/30 shrink-0">
               FF
             </div>
-            <div>
-              <span className="text-lg font-extrabold tracking-tight text-white block leading-none">
+            <div className="min-w-0">
+              <span className="text-base sm:text-lg font-extrabold tracking-tight text-white block leading-none truncate">
                 FluentFlow
               </span>
-              <span className="text-[11px] text-indigo-400 font-medium">
-                English Studio PWA
+              <span className="text-[10px] sm:text-[11px] text-indigo-400 font-medium block truncate">
+                English Studio
               </span>
             </div>
           </button>
@@ -279,30 +280,31 @@ export default function App() {
           </nav>
 
           {/* Indicadores de Ofensiva, XP, Instalar PWA e Configurações */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <button
               onClick={handleInstallClick}
-              className="px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center gap-1.5 transition"
+              className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center gap-1.5 transition"
               title="Instalar no celular ou PC como Aplicativo"
             >
-              <Smartphone className="w-4 h-4" />
+              <Smartphone className="w-4 h-4 shrink-0" />
               <span className="hidden sm:inline">Instalar App</span>
             </button>
 
             <div
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs font-bold text-amber-400"
+              className="flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs font-bold text-amber-400"
               title="Ofensiva diária (Streak)"
             >
-              <Flame className="w-4 h-4 fill-amber-400" />
+              <Flame className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-amber-400 shrink-0" />
               <span>{streak}d</span>
             </div>
 
             <div
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs font-bold text-indigo-300"
+              className="flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs font-bold text-indigo-300"
               title="Pontos de Experiência (XP)"
             >
-              <Trophy className="w-4 h-4 text-indigo-400" />
-              <span>{xp} XP</span>
+              <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-400 shrink-0" />
+              <span>{xp}</span>
+              <span className="hidden sm:inline">XP</span>
             </div>
 
             <button
@@ -318,14 +320,14 @@ export default function App() {
 
       {/* Notificação Toast Flutuante */}
       {toast && (
-        <div className="fixed bottom-20 md:bottom-6 right-4 z-50 bg-emerald-950/95 border border-emerald-500/50 text-emerald-200 px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 text-xs sm:text-sm font-semibold animate-bounce">
+        <div className="fixed bottom-20 md:bottom-6 inset-x-4 md:left-auto md:right-6 md:max-w-md z-50 bg-emerald-950/95 border border-emerald-500/50 text-emerald-200 px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 text-xs sm:text-sm font-semibold">
           <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-          <span>{toast}</span>
+          <span className="leading-snug">{toast}</span>
         </div>
       )}
 
       {/* Conteúdo Principal */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-4 sm:py-6">
         {activeTab === 'dashboard' && (
           <Dashboard
             selectedLevel={selectedLevel}
@@ -372,7 +374,7 @@ export default function App() {
       </main>
 
       {/* Barra de Navegação Mobile */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-slate-950/95 backdrop-blur-md border-t border-slate-800 px-2 py-1.5 flex items-center justify-around">
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-slate-950/95 backdrop-blur-md border-t border-slate-800 px-2 pt-1.5 pb-safe grid grid-cols-4 gap-1">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
@@ -380,14 +382,16 @@ export default function App() {
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id)}
-              className={`flex flex-col items-center gap-1 py-1.5 px-3 rounded-xl text-[11px] font-bold relative ${
-                isActive ? 'text-indigo-400' : 'text-slate-400'
+              className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-1 rounded-xl text-[11px] font-bold relative transition ${
+                isActive ? 'text-indigo-400 bg-indigo-500/10' : 'text-slate-400'
               }`}
             >
-              <Icon className="w-5 h-5" />
-              <span>{item.label}</span>
+              <Icon className="w-5 h-5 shrink-0" />
+              <span className="truncate max-w-full leading-tight">
+                {item.shortLabel || item.label}
+              </span>
               {item.badge > 0 && (
-                <span className="absolute top-1 right-2 w-4 h-4 rounded-full bg-amber-500 text-slate-950 text-[10px] font-extrabold flex items-center justify-center">
+                <span className="absolute top-1 right-2.5 w-4 h-4 rounded-full bg-amber-500 text-slate-950 text-[10px] font-extrabold flex items-center justify-center">
                   {item.badge}
                 </span>
               )}
@@ -398,8 +402,8 @@ export default function App() {
 
       {/* Modal Guia de Instalação PWA */}
       {showInstallGuide && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4">
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full max-h-[90dvh] overflow-y-auto p-5 sm:p-6 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
                 <Smartphone className="w-5 h-5 text-emerald-400" />
@@ -448,8 +452,8 @@ export default function App() {
 
       {/* Modal de Configurações + Backup */}
       {showSettings && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-5">
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full max-h-[90dvh] overflow-y-auto p-5 sm:p-6 space-y-5">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
                 <Settings className="w-5 h-5 text-indigo-400" />
