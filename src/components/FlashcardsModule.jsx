@@ -19,9 +19,11 @@ import {
 } from 'lucide-react';
 import {
   speakText,
+  speakWordByWord,
   createSpeechRecognition,
   evaluatePronunciation,
   generateProgressiveHint,
+  generatePortuguesePhonetics,
 } from '../utils/speech';
 import {
   calculateNextReview,
@@ -49,11 +51,14 @@ export default function FlashcardsModule({
   const [isRecordingPersonal, setIsRecordingPersonal] = useState(false);
 
   // Estado para Recuperação Ativa (Active Recall)
-  const [recallType, setRecallType] = useState('pt-to-en'); // 'pt-to-en' | 'audio' | 'cloze' | 'oral-prompt'
+  const [recallType, setRecallType] = useState('word-bank'); // 'word-bank' | 'pt-to-en' | 'audio' | 'cloze' | 'oral-prompt'
   const [typedAnswer, setTypedAnswer] = useState('');
   const [hintLevel, setHintLevel] = useState(0);
   const [recallFeedback, setRecallFeedback] = useState(null);
   const [isRecordingRecall, setIsRecordingRecall] = useState(false);
+
+  // Estado de Destaque Karaokê em Tempo Real
+  const [activeSpokenWordIdx, setActiveSpokenWordIdx] = useState(-1);
 
   // Estado para Técnica Shadowing
   const [shadowTargetType, setShadowTargetType] = useState('example'); // 'example' | 'chunk'
@@ -192,6 +197,31 @@ export default function FlashcardsModule({
 
   const targetRecallPhrase =
     recallType === 'cloze' ? clozeData.target : currentCard?.word || '';
+
+  // Palavras embaralhadas para o modo intuitivo "Montar Frase com Toques"
+  const shuffledWordBank = useMemo(() => {
+    if (!currentCard) return [];
+    const realWords = currentCard.word
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+    const distractors = ['please', 'today', 'really', 'now', 'always'].filter(
+      (d) =>
+        !realWords.some(
+          (rw) => rw.toLowerCase().replace(/[^a-z]/g, '') === d
+        )
+    );
+    const combined = [...realWords, ...distractors.slice(0, 2)].map(
+      (text, idx) => ({
+        id: `${currentCard.id}-wb-${idx}-${text}`,
+        text,
+      })
+    );
+    // Embaralhamento determinístico baseado no id do card
+    return combined.sort((a, b) =>
+      a.text.localeCompare(b.text) - (a.id.length % 3)
+    );
+  }, [currentCard]);
 
   const handleCheckRecall = (e) => {
     e?.preventDefault();
@@ -479,17 +509,22 @@ export default function FlashcardsModule({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          speakText(
+                          speakWordByWord(
                             isFlipped && currentCard.example
                               ? currentCard.example
                               : currentCard.word,
-                            { rate: 0.75 }
+                            {
+                              accent: preferredAccent,
+                              rate: 0.65,
+                              onWordBoundary: (idx) =>
+                                setActiveSpokenWordIdx(idx),
+                            }
                           );
                         }}
-                        className="px-2 sm:px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700"
-                        title="Ouvir devagar (0.75x)"
+                        className="px-2 sm:px-2.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 text-xs font-bold border border-amber-500/40"
+                        title="Ouvir pausadamente palavra por palavra"
                       >
-                        🐢 0.75x
+                        🔍 Pausado
                       </button>
                       <button
                         onClick={(e) => {
@@ -498,7 +533,32 @@ export default function FlashcardsModule({
                             isFlipped && currentCard.example
                               ? currentCard.example
                               : currentCard.word,
-                            { rate: 0.95 }
+                            {
+                              rate: 0.55,
+                              accent: preferredAccent,
+                              onWordBoundary: (idx) =>
+                                setActiveSpokenWordIdx(idx),
+                            }
+                          );
+                        }}
+                        className="px-2 sm:px-2.5 py-2 rounded-xl bg-emerald-600/25 hover:bg-emerald-600/40 text-emerald-200 text-xs font-bold border border-emerald-500/40"
+                        title="Ouvir bem devagar (0.55x)"
+                      >
+                        🐢 0.55x
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          speakText(
+                            isFlipped && currentCard.example
+                              ? currentCard.example
+                              : currentCard.word,
+                            {
+                              rate: 0.85,
+                              accent: preferredAccent,
+                              onWordBoundary: (idx) =>
+                                setActiveSpokenWordIdx(idx),
+                            }
                           );
                         }}
                         className="p-2.5 sm:p-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white transition shadow-lg shadow-indigo-600/30"
@@ -515,13 +575,34 @@ export default function FlashcardsModule({
                         Bloco de Linguagem / Expressão
                       </p>
                       <h3 className="text-2xl sm:text-4xl font-extrabold text-white break-words">
-                        “{currentCard.word}”
+                        “
+                        {currentCard.word
+                          .split(/\s+/)
+                          .map((w, idx) => (
+                            <span
+                              key={idx}
+                              className={`inline-block rounded px-1 transition ${
+                                activeSpokenWordIdx === idx
+                                  ? 'bg-emerald-500 text-slate-950 scale-105'
+                                  : ''
+                              }`}
+                            >
+                              {w}{' '}
+                            </span>
+                          ))}
+                        ”
                       </h3>
-                      <p className="text-sm font-mono text-slate-400">
-                        {currentCard.phonetic}
-                      </p>
-                      <p className="text-xs text-slate-400 pt-4">
-                        🧠 Tente lembrar o significado e uma frase com esta expressão antes de virar!
+                      <div className="inline-flex flex-col sm:flex-row items-center gap-2 bg-amber-500/10 border border-amber-500/30 px-3.5 py-1.5 rounded-xl">
+                        <span className="text-xs sm:text-sm font-bold text-amber-300">
+                          🗣️ Como ler: “
+                          {generatePortuguesePhonetics(currentCard.word)}”
+                        </span>
+                        <span className="text-xs font-mono text-slate-400">
+                          ({currentCard.phonetic})
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 pt-3">
+                        🧠 Ouça devagar (`🐢 0.55x`) ou `🔍 Pausado`, repita em voz alta e toque para ver o significado!
                       </p>
                     </div>
                   ) : (
@@ -546,21 +627,41 @@ export default function FlashcardsModule({
                       )}
 
                       <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2">
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
                           <span className="text-xs font-semibold text-indigo-300">
                             Aplicação Principal:
                           </span>
-                          <button
-                            onClick={() =>
-                              speakText(currentCard.example, { rate: 0.95 })
-                            }
-                            className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
-                          >
-                            <Volume2 className="w-3.5 h-3.5" /> Ouvir frase
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() =>
+                                speakText(currentCard.example, {
+                                  rate: 0.55,
+                                  accent: preferredAccent,
+                                })
+                              }
+                              className="text-xs text-emerald-300 hover:text-emerald-200 font-semibold"
+                            >
+                              🐢 Lento (0.55x)
+                            </button>
+                            <button
+                              onClick={() =>
+                                speakText(currentCard.example, {
+                                  rate: 0.85,
+                                  accent: preferredAccent,
+                                })
+                              }
+                              className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-semibold"
+                            >
+                              <Volume2 className="w-3.5 h-3.5" /> Ouvir frase
+                            </button>
+                          </div>
                         </div>
                         <p className="text-base font-medium text-white">
                           "{currentCard.example}"
+                        </p>
+                        <p className="text-xs font-medium text-amber-300">
+                          🗣️ Como ler: “
+                          {generatePortuguesePhonetics(currentCard.example)}”
                         </p>
                         {currentCard.exampleTranslation && (
                           <p className="text-xs text-slate-400">
@@ -735,10 +836,10 @@ export default function FlashcardsModule({
             </span>
             <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-1.5 w-full sm:w-auto">
               {[
+                { id: 'word-bank', label: '🧩 Montar com Toques' },
                 { id: 'pt-to-en', label: '🇧🇷 Tradução → Inglês' },
-                { id: 'audio', label: '🎧 Escuta Cega (Áudio)' },
-                { id: 'cloze', label: '🧩 Completar Lacuna' },
-                { id: 'oral-prompt', label: '🗣️ Resposta Livre' },
+                { id: 'audio', label: '🎧 Escuta (Áudio)' },
+                { id: 'cloze', label: '✍️ Completar Lacuna' },
               ].map((t) => (
                 <button
                   key={t.id}
@@ -760,6 +861,46 @@ export default function FlashcardsModule({
 
           {/* Estímulo conforme o modo selecionado */}
           <div className="text-center space-y-3 py-2">
+            {recallType === 'word-bank' && (
+              <>
+                <p className="text-xs text-slate-400">
+                  Toque nas palavras abaixo na ordem certa para dizer em inglês:
+                </p>
+                <h3 className="text-2xl sm:text-3xl font-extrabold text-emerald-300">
+                  “{currentCard.translation}”
+                </h3>
+                <div className="flex flex-wrap justify-center gap-2 pt-3">
+                  {shuffledWordBank.map((wb) => (
+                    <button
+                      key={wb.id}
+                      type="button"
+                      onClick={() => {
+                        speakText(wb.text, {
+                          rate: 0.75,
+                          accent: preferredAccent,
+                        });
+                        setTypedAnswer((prev) =>
+                          prev ? `${prev.trim()} ${wb.text}` : wb.text
+                        );
+                      }}
+                      className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-indigo-600 border border-slate-700 hover:border-indigo-400 text-white font-bold text-sm transition shadow"
+                    >
+                      {wb.text}
+                    </button>
+                  ))}
+                  {typedAnswer && (
+                    <button
+                      type="button"
+                      onClick={() => setTypedAnswer('')}
+                      className="px-3 py-2 rounded-xl bg-rose-950/60 border border-rose-500/30 text-rose-300 text-xs font-semibold"
+                    >
+                      Limpar
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+
             {recallType === 'pt-to-en' && (
               <>
                 <p className="text-xs text-slate-400">
@@ -1041,6 +1182,10 @@ export default function FlashcardsModule({
               })}
             </div>
 
+            <p className="text-xs font-semibold text-amber-300 bg-amber-500/10 py-1.5 px-3 rounded-xl border border-amber-500/20 inline-block">
+              🗣️ Como ler: “{generatePortuguesePhonetics(shadowSentence)}”
+            </p>
+
             <p className="text-xs text-slate-400 pt-1">
               🇧🇷{' '}
               {shadowTargetType === 'example'
@@ -1050,29 +1195,53 @@ export default function FlashcardsModule({
           </div>
 
           {/* Passos 1, 2, 3 e 4 do Shadowing */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
             <button
               type="button"
-              onClick={() => speakText(shadowSentence, { rate: 1.0 })}
-              className="p-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex flex-col items-center gap-1.5 border border-slate-700 transition"
+              onClick={() =>
+                speakText(shadowSentence, {
+                  rate: 0.85,
+                  accent: preferredAccent,
+                })
+              }
+              className="p-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex flex-col items-center gap-1.5 border border-slate-700 transition"
             >
               <Volume2 className="w-5 h-5 text-indigo-400" />
-              <span>1. Ouvir Natural (1.0x)</span>
+              <span>1. Normal (0.85x)</span>
             </button>
 
             <button
               type="button"
-              onClick={() => speakText(shadowSentence, { rate: 0.72 })}
-              className="p-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex flex-col items-center gap-1.5 border border-slate-700 transition"
+              onClick={() =>
+                speakText(shadowSentence, {
+                  rate: 0.55,
+                  accent: preferredAccent,
+                })
+              }
+              className="p-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-emerald-200 font-bold text-xs flex flex-col items-center gap-1.5 border border-emerald-500/30 transition"
             >
-              <Headphones className="w-5 h-5 text-amber-400" />
-              <span>2. Velocidade Reduzida (0.75x)</span>
+              <Headphones className="w-5 h-5 text-emerald-400" />
+              <span>2. Bem Lento (0.55x)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                speakWordByWord(shadowSentence, {
+                  accent: preferredAccent,
+                  rate: 0.65,
+                })
+              }
+              className="p-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-amber-200 font-bold text-xs flex flex-col items-center gap-1.5 border border-amber-500/30 transition"
+            >
+              <Sparkles className="w-5 h-5 text-amber-400" />
+              <span>3. Pausado (Palavra)</span>
             </button>
 
             <button
               type="button"
               onClick={handleStartShadowingMic}
-              className={`p-4 rounded-2xl font-bold text-xs flex flex-col items-center gap-1.5 border transition ${
+              className={`p-3.5 rounded-2xl font-bold text-xs flex flex-col items-center gap-1.5 border transition ${
                 isShadowRecording
                   ? 'bg-rose-600 border-rose-400 text-white animate-pulse shadow-lg shadow-rose-600/30'
                   : 'bg-indigo-600 hover:bg-indigo-500 border-indigo-400 text-white shadow-lg shadow-indigo-600/30'
@@ -1081,12 +1250,12 @@ export default function FlashcardsModule({
               {isShadowRecording ? (
                 <>
                   <MicOff className="w-5 h-5" />
-                  <span>Ouvindo... (Clique p/ parar)</span>
+                  <span>Parar Gravação</span>
                 </>
               ) : (
                 <>
                   <Mic className="w-5 h-5" />
-                  <span>3. Repetir no Microfone</span>
+                  <span>4. Falar no Microfone</span>
                 </>
               )}
             </button>

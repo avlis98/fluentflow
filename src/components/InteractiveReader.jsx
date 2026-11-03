@@ -22,9 +22,11 @@ import {
 import { INTERACTIVE_TEXTS, COMMON_DICTIONARY } from '../data/content';
 import {
   speakText,
+  speakWordByWord,
   stopSpeaking,
   createSpeechRecognition,
   evaluatePronunciation,
+  generatePortuguesePhonetics,
 } from '../utils/speech';
 
 export default function InteractiveReader({
@@ -54,11 +56,12 @@ export default function InteractiveReader({
     allTexts.find((t) => t.id === activeTextId) || allTexts[0];
 
   const [showTranslations, setShowTranslations] = useState(true);
-  const [speechRate, setSpeechRate] = useState(1.0);
+  const [speechRate, setSpeechRate] = useState(0.85);
   const [accent, setAccent] = useState(
     activeText.accent || preferredAccent || 'en-US'
   );
   const [playingParagraphIdx, setPlayingParagraphIdx] = useState(null);
+  const [activeParaWordIdx, setActiveParaWordIdx] = useState(-1);
   const [selectedWordInfo, setSelectedWordInfo] = useState(null);
   const [customWordTranslation, setCustomWordTranslation] = useState('');
   const [quizAnswers, setQuizAnswers] = useState({});
@@ -97,18 +100,21 @@ export default function InteractiveReader({
     if (playingParagraphIdx !== null) {
       stopSpeaking();
       setPlayingParagraphIdx(null);
+      setActiveParaWordIdx(-1);
       return;
     }
 
     const playParagraph = (index) => {
       if (index >= activeText.paragraphs.length) {
         setPlayingParagraphIdx(null);
+        setActiveParaWordIdx(-1);
         return;
       }
       setPlayingParagraphIdx(index);
       speakText(activeText.paragraphs[index].en.replace(/🎵/g, ''), {
         rate: speechRate,
         accent,
+        onWordBoundary: (wIdx) => setActiveParaWordIdx(wIdx),
         onEnd: () => playParagraph(index + 1),
       });
     };
@@ -116,18 +122,41 @@ export default function InteractiveReader({
     playParagraph(0);
   };
 
-  const handlePlayParagraph = (index, customRate = speechRate) => {
-    if (playingParagraphIdx === index) {
+  const handlePlayParagraph = (
+    index,
+    customRate = speechRate,
+    wordByWord = false
+  ) => {
+    if (playingParagraphIdx === index && !wordByWord) {
       stopSpeaking();
       setPlayingParagraphIdx(null);
+      setActiveParaWordIdx(-1);
       return;
     }
     setPlayingParagraphIdx(index);
-    speakText(activeText.paragraphs[index].en.replace(/🎵/g, ''), {
-      rate: customRate,
-      accent,
-      onEnd: () => setPlayingParagraphIdx(null),
-    });
+    const cleanSentence = activeText.paragraphs[index].en.replace(/🎵/g, '');
+    if (wordByWord) {
+      speakWordByWord(cleanSentence, {
+        accent,
+        rate: 0.65,
+        pauseMs: 360,
+        onWordBoundary: (wIdx) => setActiveParaWordIdx(wIdx),
+        onEnd: () => {
+          setPlayingParagraphIdx(null);
+          setActiveParaWordIdx(-1);
+        },
+      });
+    } else {
+      speakText(cleanSentence, {
+        rate: customRate,
+        accent,
+        onWordBoundary: (wIdx) => setActiveParaWordIdx(wIdx),
+        onEnd: () => {
+          setPlayingParagraphIdx(null);
+          setActiveParaWordIdx(-1);
+        },
+      });
+    }
   };
 
   const handleToggleParagraphShadowing = (pIdx, paragraphText) => {
@@ -468,19 +497,34 @@ export default function InteractiveReader({
                   <h3 className="text-xl font-extrabold text-white">
                     “{selectedWordInfo.word}”
                   </h3>
-                  <p className="text-xs font-mono text-indigo-300">
+                  <p className="text-xs font-bold text-amber-300 mt-0.5">
+                    🗣️ Como soa: “
+                    {generatePortuguesePhonetics(selectedWordInfo.word)}”
+                  </p>
+                  <p className="text-[11px] font-mono text-indigo-300">
                     {selectedWordInfo.phonetic}
                   </p>
                 </div>
-                <button
-                  onClick={() =>
-                    speakText(selectedWordInfo.word, { rate: 0.9, accent })
-                  }
-                  className="p-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white transition shadow"
-                  title="Ouvir pronúncia"
-                >
-                  <Volume2 className="w-5 h-5" />
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() =>
+                      speakText(selectedWordInfo.word, { rate: 0.55, accent })
+                    }
+                    className="px-2 py-2 rounded-xl bg-emerald-600/25 border border-emerald-500/40 text-emerald-200 text-xs font-bold"
+                    title="Ouvir bem devagar (0.55x)"
+                  >
+                    🐢 0.55x
+                  </button>
+                  <button
+                    onClick={() =>
+                      speakText(selectedWordInfo.word, { rate: 0.85, accent })
+                    }
+                    className="p-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white transition shadow"
+                    title="Ouvir pronúncia"
+                  >
+                    <Volume2 className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
 
               <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1.5">
@@ -630,20 +674,25 @@ export default function InteractiveReader({
 
           {/* Barra de velocidade e sotaque */}
           <div className="flex flex-wrap items-center justify-between gap-3 py-3 px-4 my-4 rounded-xl bg-slate-950/70 border border-slate-800/80 text-xs">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-1.5">
               <Gauge className="w-4 h-4 text-indigo-400" />
-              <span className="text-slate-400">Velocidade da fala:</span>
-              {[0.75, 1.0, 1.2].map((rate) => (
+              <span className="text-slate-400">Velocidade:</span>
+              {[
+                { val: 0.55, label: '🐢 0.55x (Bem Lento)' },
+                { val: 0.75, label: '0.75x (Didático)' },
+                { val: 0.85, label: '0.85x (Calmo)' },
+                { val: 1.0, label: '1.0x (Natural)' },
+              ].map((item) => (
                 <button
-                  key={rate}
-                  onClick={() => setSpeechRate(rate)}
+                  key={item.val}
+                  onClick={() => setSpeechRate(item.val)}
                   className={`px-2 py-1 rounded-md font-semibold transition ${
-                    speechRate === rate
+                    speechRate === item.val
                       ? 'bg-indigo-600 text-white'
                       : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                   }`}
                 >
-                  {rate}x
+                  {item.label}
                 </button>
               ))}
             </div>
@@ -743,6 +792,8 @@ export default function InteractiveReader({
 
                           const shadowWordStatus =
                             shadowEval?.wordAnalysis?.[tIdx]?.status;
+                          const isKaraokeActive =
+                            isPlayingThis && activeParaWordIdx === tIdx;
 
                           return (
                             <React.Fragment key={tIdx}>
@@ -750,8 +801,10 @@ export default function InteractiveReader({
                                 onClick={() =>
                                   handleWordClick(token, para.en, para.pt)
                                 }
-                                className={`cursor-pointer rounded px-0.5 transition-colors ${
-                                  shadowWordStatus === 'correct'
+                                className={`cursor-pointer rounded px-0.5 transition-all ${
+                                  isKaraokeActive
+                                    ? 'bg-emerald-500 text-slate-950 font-black scale-105 shadow inline-block'
+                                    : shadowWordStatus === 'correct'
                                     ? 'bg-emerald-500/20 text-emerald-300 font-semibold'
                                     : shadowWordStatus === 'missed'
                                     ? 'bg-rose-500/20 text-rose-300 underline decoration-wavy'
@@ -770,19 +823,29 @@ export default function InteractiveReader({
                       </p>
 
                       {showTranslations && (
-                        <p className="text-sm text-slate-400 border-l-2 border-slate-700 pl-3">
-                          {para.pt}
-                        </p>
+                        <div className="space-y-1 border-l-2 border-slate-700 pl-3">
+                          <p className="text-xs font-medium text-amber-300/90">
+                            🗣️ Como soa: “{generatePortuguesePhonetics(para.en)}”
+                          </p>
+                          <p className="text-sm text-slate-400">{para.pt}</p>
+                        </div>
                       )}
 
                       {/* Barra de ações rápidas do parágrafo (Shadowing lento + feedback) */}
                       <div className="pt-1 flex flex-wrap items-center gap-2 text-[11px]">
                         <button
                           type="button"
-                          onClick={() => handlePlayParagraph(pIdx, 0.75)}
-                          className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800"
+                          onClick={() => handlePlayParagraph(pIdx, 0.55)}
+                          className="px-2.5 py-1 rounded-lg bg-emerald-950/70 hover:bg-emerald-900 text-emerald-200 border border-emerald-500/30 font-semibold"
                         >
-                          🐢 Ouvir 0.75x
+                          🐢 Bem Lento (0.55x)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handlePlayParagraph(pIdx, 0.65, true)}
+                          className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-indigo-300 border border-slate-800 font-semibold"
+                        >
+                          🔍 Palavra por Palavra
                         </button>
                         <button
                           type="button"

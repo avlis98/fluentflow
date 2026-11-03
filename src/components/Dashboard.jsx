@@ -32,9 +32,11 @@ import {
 import { getSmartReviewQueue, calculateNextReview } from '../utils/srs';
 import {
   speakText,
+  speakWordByWord,
   generateProgressiveHint,
   createSpeechRecognition,
   evaluatePronunciation,
+  generatePortuguesePhonetics,
 } from '../utils/speech';
 
 const APP_SHARE_URL = 'https://avlis98.github.io/fluentflow/';
@@ -434,18 +436,50 @@ export default function Dashboard({
               </p>
             )}
             {quickRevealed && (
-              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1 mt-2">
-                <div className="flex items-center justify-between">
+              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5 mt-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="text-base font-extrabold text-white">
                     “{urgentCard.word}”
                   </span>
-                  <button
-                    onClick={() => speakText(urgentCard.example || urgentCard.word)}
-                    className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
-                  >
-                    <Volume2 className="w-3.5 h-3.5" /> Ouvir
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() =>
+                        speakText(urgentCard.word, {
+                          rate: 0.55,
+                          accent: preferredAccent,
+                        })
+                      }
+                      className="text-xs text-emerald-300 hover:text-emerald-200 font-bold"
+                    >
+                      🐢 0.55x
+                    </button>
+                    <button
+                      onClick={() =>
+                        speakWordByWord(urgentCard.word, {
+                          accent: preferredAccent,
+                          rate: 0.65,
+                        })
+                      }
+                      className="text-xs text-amber-300 hover:text-amber-200 font-bold"
+                    >
+                      🔍 Pausado
+                    </button>
+                    <button
+                      onClick={() =>
+                        speakText(urgentCard.example || urgentCard.word, {
+                          rate: 0.85,
+                          accent: preferredAccent,
+                        })
+                      }
+                      className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-bold"
+                    >
+                      <Volume2 className="w-3.5 h-3.5" /> Ouvir
+                    </button>
+                  </div>
                 </div>
+                <p className="text-xs font-medium text-amber-300">
+                  🗣️ Como ler: “{generatePortuguesePhonetics(urgentCard.word)}”
+                </p>
                 <p className="text-xs text-slate-400 italic">
                   "{urgentCard.example}"
                 </p>
@@ -930,7 +964,7 @@ export default function Dashboard({
 
                   {sprintRevealed && (
                     <div className="pt-2 border-t border-slate-800 space-y-2">
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
                         <span className="text-lg font-extrabold text-white">
                           “{currentSprintCard.word}”
                         </span>
@@ -939,28 +973,44 @@ export default function Dashboard({
                             type="button"
                             onClick={() =>
                               speakText(currentSprintCard.word, {
-                                rate: 1.0,
+                                rate: 0.85,
                                 accent: preferredAccent,
                               })
                             }
                             className="px-2.5 py-1 rounded-lg bg-indigo-600 text-white text-xs font-bold flex items-center gap-1"
                           >
-                            <Volume2 className="w-3.5 h-3.5" /> 1.0x
+                            <Volume2 className="w-3.5 h-3.5" /> Normal
                           </button>
                           <button
                             type="button"
                             onClick={() =>
                               speakText(currentSprintCard.word, {
-                                rate: 0.75,
+                                rate: 0.55,
                                 accent: preferredAccent,
                               })
                             }
-                            className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 text-xs font-semibold"
+                            className="px-2.5 py-1 rounded-lg bg-emerald-950 border border-emerald-500/40 text-emerald-300 text-xs font-bold"
                           >
-                            🐢 0.75x
+                            🐢 0.55x
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              speakWordByWord(currentSprintCard.word, {
+                                accent: preferredAccent,
+                                rate: 0.65,
+                              })
+                            }
+                            className="px-2.5 py-1 rounded-lg bg-slate-800 text-amber-300 text-xs font-semibold"
+                          >
+                            🔍 Pausado
                           </button>
                         </div>
                       </div>
+                      <p className="text-xs font-semibold text-amber-300">
+                        🗣️ Como ler: “
+                        {generatePortuguesePhonetics(currentSprintCard.word)}”
+                      </p>
                       <p className="text-xs text-slate-400 italic">
                         Exemplo: "{currentSprintCard.example}"
                       </p>
