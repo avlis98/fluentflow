@@ -166,11 +166,21 @@ export default function InteractiveReader({
       return;
     }
 
+    if (isRecordingShadow) {
+      recognitionRef.current?.stop();
+    }
+
+    let latestTranscript = '';
     setShadowingParaIdx(pIdx);
+
     const recognition = createSpeechRecognition({
       lang: accent,
-      onResult: (transcript) => {
-        const evaluation = evaluatePronunciation(paragraphText, transcript);
+      continuous: true,
+      onResult: (transcript, isFinal) => {
+        latestTranscript = transcript;
+        const evaluation = evaluatePronunciation(paragraphText, transcript, {
+          isInterim: !isFinal,
+        });
         setShadowResultsByPara((prev) => ({
           ...prev,
           [pIdx]: {
@@ -180,7 +190,23 @@ export default function InteractiveReader({
         }));
       },
       onError: () => setIsRecordingShadow(false),
-      onEnd: () => setIsRecordingShadow(false),
+      onEnd: () => {
+        setIsRecordingShadow(false);
+        if (latestTranscript.trim()) {
+          const finalEval = evaluatePronunciation(
+            paragraphText,
+            latestTranscript,
+            { isInterim: false }
+          );
+          setShadowResultsByPara((prev) => ({
+            ...prev,
+            [pIdx]: {
+              transcript: latestTranscript,
+              ...finalEval,
+            },
+          }));
+        }
+      },
     });
 
     if (!recognition) {
@@ -730,18 +756,23 @@ export default function InteractiveReader({
               const isShadowingThis =
                 isRecordingShadow && shadowingParaIdx === pIdx;
               const shadowEval = shadowResultsByPara[pIdx];
-              const tokens = para.en.split(' ');
+              const hasMusicNote = para.en.includes('🎵');
+              const tokens = para.en
+                .replace(/🎵/g, '')
+                .trim()
+                .split(/\s+/)
+                .filter(Boolean);
 
               return (
                 <div
                   key={pIdx}
-                  className={`p-4 rounded-2xl border transition-all space-y-3 ${
+                  className={`p-4 rounded-2xl border transition-colors space-y-3 overflow-hidden ${
                     isPlayingThis
                       ? 'bg-indigo-950/40 border-indigo-500/60 shadow-md'
                       : 'bg-slate-950/40 border-slate-800/80 hover:border-slate-700/80'
                   }`}
                 >
-                  <div className="flex items-start gap-3">
+                  <div className="flex items-start gap-3 min-w-0">
                     <div className="flex flex-col gap-1.5 shrink-0 mt-1">
                       <button
                         onClick={() => handlePlayParagraph(pIdx)}
@@ -774,8 +805,13 @@ export default function InteractiveReader({
                       </button>
                     </div>
 
-                    <div className="space-y-2 flex-1">
-                      <p className="text-lg leading-relaxed text-slate-100 font-medium">
+                    <div className="space-y-2 flex-1 min-w-0">
+                      <p className="text-base sm:text-lg leading-relaxed text-slate-100 font-medium break-words">
+                        {hasMusicNote && (
+                          <span className="mr-1.5 select-none" aria-hidden="true">
+                            🎵
+                          </span>
+                        )}
                         {tokens.map((token, tIdx) => {
                           const clean = token
                             .toLowerCase()
@@ -801,17 +837,19 @@ export default function InteractiveReader({
                                 onClick={() =>
                                   handleWordClick(token, para.en, para.pt)
                                 }
-                                className={`cursor-pointer rounded px-0.5 transition-all ${
+                                className={`cursor-pointer rounded px-0.5 transition-colors ${
                                   isKaraokeActive
-                                    ? 'bg-emerald-500 text-slate-950 font-black scale-105 shadow inline-block'
+                                    ? 'bg-emerald-400 text-slate-950'
                                     : shadowWordStatus === 'correct'
-                                    ? 'bg-emerald-500/20 text-emerald-300 font-semibold'
+                                    ? 'bg-emerald-500/25 text-emerald-200'
+                                    : shadowWordStatus === 'close'
+                                    ? 'bg-amber-500/25 text-amber-200'
                                     : shadowWordStatus === 'missed'
-                                    ? 'bg-rose-500/20 text-rose-300 underline decoration-wavy'
+                                    ? 'bg-rose-500/25 text-rose-200 underline decoration-rose-400/80 underline-offset-4'
                                     : isSelectedWord
-                                    ? 'bg-indigo-500 text-white font-semibold'
+                                    ? 'bg-indigo-500 text-white'
                                     : isHighlighted
-                                    ? 'text-indigo-300 underline decoration-indigo-400/70 decoration-dotted underline-offset-4 hover:bg-indigo-500/20 font-semibold'
+                                    ? 'text-indigo-300 underline decoration-indigo-400/70 decoration-dotted underline-offset-4 hover:bg-indigo-500/20'
                                     : 'hover:bg-slate-800 hover:text-indigo-200'
                                 }`}
                               >
@@ -823,11 +861,13 @@ export default function InteractiveReader({
                       </p>
 
                       {showTranslations && (
-                        <div className="space-y-1 border-l-2 border-slate-700 pl-3">
-                          <p className="text-xs font-medium text-amber-300/90">
+                        <div className="space-y-1 border-l-2 border-slate-700 pl-3 min-w-0">
+                          <p className="text-xs font-medium text-amber-300/90 break-words">
                             🗣️ Como soa: “{generatePortuguesePhonetics(para.en)}”
                           </p>
-                          <p className="text-sm text-slate-400">{para.pt}</p>
+                          <p className="text-sm text-slate-400 break-words">
+                            {para.pt}
+                          </p>
                         </div>
                       )}
 
@@ -860,22 +900,31 @@ export default function InteractiveReader({
                         >
                           <AudioWaveform className="w-3.5 h-3.5" />
                           {isShadowingThis
-                            ? 'Gravando... clique p/ parar'
+                            ? 'Finalizar Gravação'
                             : 'Treinar Shadowing'}
                         </button>
                       </div>
 
                       {shadowEval && (
-                        <div className="p-3 rounded-xl bg-slate-900/95 border border-slate-800 text-xs space-y-1">
-                          <div className="flex items-center justify-between">
+                        <div className="p-3 rounded-xl bg-slate-900/95 border border-slate-800 text-xs space-y-1.5 min-w-0">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
                             <span className="font-bold text-emerald-400">
                               🎙️ Precisão do Shadowing: {shadowEval.accuracy}%
                             </span>
-                            <span className="text-slate-400 italic truncate max-w-xs">
-                              Você disse: "{shadowEval.transcript}"
-                            </span>
+                            {isShadowingThis && (
+                              <span className="text-[11px] text-rose-300 font-semibold animate-pulse">
+                                ● Ouvindo sua voz... clique no microfone ao terminar
+                              </span>
+                            )}
                           </div>
-                          <p className="text-slate-300">{shadowEval.feedback}</p>
+                          {shadowEval.transcript && (
+                            <p className="text-slate-400 italic break-words">
+                              Você disse: “{shadowEval.transcript}”
+                            </p>
+                          )}
+                          <p className="text-slate-300 break-words">
+                            {shadowEval.feedback}
+                          </p>
                         </div>
                       )}
                     </div>

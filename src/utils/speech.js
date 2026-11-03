@@ -177,7 +177,13 @@ export function stopSpeaking() {
   }
 }
 
-export function createSpeechRecognition({ lang = 'en-US', onResult, onError, onEnd } = {}) {
+export function createSpeechRecognition({
+  lang = 'en-US',
+  continuous = false,
+  onResult,
+  onError,
+  onEnd,
+} = {}) {
   if (typeof window === 'undefined') return null;
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) return null;
@@ -185,18 +191,18 @@ export function createSpeechRecognition({ lang = 'en-US', onResult, onError, onE
   const recognition = new SpeechRecognition();
   recognition.lang = lang;
   recognition.interimResults = true;
-  recognition.continuous = false;
+  recognition.continuous = continuous;
 
   recognition.onresult = (event) => {
     let transcript = '';
-    let isFinal = false;
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-      transcript += event.results[i][0].transcript;
-      if (event.results[i].isFinal) {
-        isFinal = true;
+    let isFinal = true;
+    for (let i = 0; i < event.results.length; i++) {
+      transcript += (i > 0 ? ' ' : '') + event.results[i][0].transcript.trim();
+      if (!event.results[i].isFinal) {
+        isFinal = false;
       }
     }
-    if (onResult) onResult(transcript, isFinal);
+    if (onResult) onResult(transcript.trim(), isFinal);
   };
 
   recognition.onerror = (event) => {
@@ -258,8 +264,12 @@ function levenshteinDistance(a, b) {
 }
 
 // Avalia a pronúncia no modo Shadowing comparando a frase modelo e a transcrição reconhecida
-export function evaluatePronunciation(targetSentence, spokenTranscript) {
-  const originalDisplayWords = targetSentence
+export function evaluatePronunciation(
+  targetSentence,
+  spokenTranscript,
+  { isInterim = false } = {}
+) {
+  const originalDisplayWords = String(targetSentence || '')
     .replace(/🎵/g, '')
     .trim()
     .split(/\s+/)
@@ -269,15 +279,19 @@ export function evaluatePronunciation(targetSentence, spokenTranscript) {
   if (spokenTokens.length === 0) {
     return {
       accuracy: 0,
+      isInterim,
       wordAnalysis: originalDisplayWords.map((w) => ({
         word: w,
-        status: 'missed',
+        status: isInterim ? 'pending' : 'missed',
       })),
-      feedback: 'Não detectamos sua voz. Tente falar um pouco mais perto do microfone.',
+      feedback: isInterim
+        ? 'Ouvindo sua voz... continue lendo a frase em voz alta.'
+        : 'Não detectamos sua voz. Tente falar um pouco mais perto do microfone.',
     };
   }
 
   let matchedScore = 0;
+  let evaluableCount = 0;
   const usedIndices = new Set();
 
   const wordAnalysis = originalDisplayWords.map((rawWord) => {
@@ -287,8 +301,10 @@ export function evaluatePronunciation(targetSentence, spokenTranscript) {
       .replace(/[^a-z0-9']/g, '');
 
     if (!cleanTarget) {
-      return { word: rawWord, status: 'correct' };
+      return { word: rawWord, status: 'pending' };
     }
+
+    evaluableCount += 1;
 
     // Procura correspondência exata
     let foundIdx = spokenTokens.findIndex(
@@ -321,12 +337,12 @@ export function evaluatePronunciation(targetSentence, spokenTranscript) {
       return { word: rawWord, status: 'close' };
     }
 
-    return { word: rawWord, status: 'missed' };
+    return { word: rawWord, status: isInterim ? 'pending' : 'missed' };
   });
 
   const accuracy = Math.min(
     100,
-    Math.round((matchedScore / Math.max(1, originalDisplayWords.length)) * 100)
+    Math.round((matchedScore / Math.max(1, evaluableCount)) * 100)
   );
 
   const missedWords = wordAnalysis
@@ -335,7 +351,9 @@ export function evaluatePronunciation(targetSentence, spokenTranscript) {
     .filter(Boolean);
 
   let feedback = '';
-  if (accuracy >= 90) {
+  if (isInterim) {
+    feedback = '🎙️ Ouvindo em tempo real... as palavras reconhecidas ficam verdes enquanto você lê.';
+  } else if (accuracy >= 90) {
     feedback = 'Excelente pronúncia e ritmo! Todas as palavras soaram claras e naturais.';
   } else if (accuracy >= 70) {
     feedback =
@@ -345,12 +363,13 @@ export function evaluatePronunciation(targetSentence, spokenTranscript) {
   } else {
     feedback =
       missedWords.length > 0
-        ? `Ouça em velocidade reduzida (0.75x) e foque nas palavras destacadas em vermelho: "${missedWords.slice(0, 4).join(', ')}".`
-        : 'Ouça o modelo em 0.75x e repita acompanhando o ritmo da frase.';
+        ? `Ouça em velocidade reduzida (0.55x) e foque nas palavras destacadas em vermelho: "${missedWords.slice(0, 4).join(', ')}".`
+        : 'Ouça o modelo em 0.55x e repita acompanhando o ritmo da frase.';
   }
 
   return {
     accuracy,
+    isInterim,
     wordAnalysis,
     feedback,
   };
