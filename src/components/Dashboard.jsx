@@ -94,6 +94,8 @@ export default function Dashboard({
   const [labInput, setLabInput] = useState('');
   const [labAnalysis, setLabAnalysis] = useState(null);
   const [isLabRecording, setIsLabRecording] = useState(false);
+  const [showLabSection, setShowLabSection] = useState(false);
+  const [showMethodSection, setShowMethodSection] = useState(false);
 
   const urgentCard = smartQueue[0] || null;
   const progressPercent = Math.min(100, Math.round((xp / dailyGoal) * 100));
@@ -631,182 +633,243 @@ export default function Dashboard({
         </div>
       </div>
 
-      {/* Laboratório Rápido de Frases & Correção Instantânea */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-6 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div>
-            <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
-              <Wand2 className="w-4 h-4 text-indigo-400" />
-              Laboratório Rápido: Teste ou Corrija uma Frase em Inglês
-            </h3>
-            <p className="text-xs text-slate-400">
-              Digite ou fale qualquer frase que queira usar no trabalho ou viagem para ouvir a pronúncia no sotaque escolhido e checar se soa natural.
-            </p>
-          </div>
-        </div>
-
-        <form
-          onSubmit={handleAnalyzeLabSentence}
-          className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2"
+      {/* Ferramentas Extras Recolhíveis (Laboratório de Frases + Roteiro de 15 Min) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <button
+          type="button"
+          onClick={() => setShowLabSection((prev) => !prev)}
+          className={`p-4 rounded-2xl border text-left transition flex items-center justify-between gap-3 ${
+            showLabSection
+              ? 'bg-indigo-950/60 border-indigo-500/50 text-white'
+              : 'bg-slate-900/90 border-slate-800 hover:border-indigo-500/40 text-slate-200'
+          }`}
         >
-          <div className="flex items-center gap-2 flex-1">
-            <button
-              type="button"
-              onClick={handleLabMic}
-              className={`p-2.5 rounded-xl border transition shrink-0 ${
-                isLabRecording
-                  ? 'bg-rose-600 border-rose-400 text-white animate-pulse'
-                  : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-indigo-500'
-              }`}
-              title="Falar frase pelo microfone"
-            >
-              {isLabRecording ? (
-                <MicOff className="w-4 h-4" />
-              ) : (
-                <Mic className="w-4 h-4" />
-              )}
-            </button>
-            <input
-              type="text"
-              value={labInput}
-              onChange={(e) => setLabInput(e.target.value)}
-              placeholder='Ex: "I have a doubt about the meeting" ou "I want a coffee"'
-              className="flex-1 px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs sm:text-sm text-white focus:outline-none focus:border-indigo-500"
-            />
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
+              <Wand2 className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-white truncate">
+                Laboratório de Frases
+              </p>
+              <p className="text-[11px] text-slate-400 truncate">
+                Teste ou corrija qualquer frase em inglês
+              </p>
+            </div>
+          </div>
+          <span className="text-xs font-bold text-indigo-300 shrink-0">
+            {showLabSection ? 'Fechar ▲' : 'Abrir ▼'}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setShowMethodSection((prev) => !prev)}
+          className={`p-4 rounded-2xl border text-left transition flex items-center justify-between gap-3 ${
+            showMethodSection
+              ? 'bg-emerald-950/50 border-emerald-500/50 text-white'
+              : 'bg-slate-900/90 border-slate-800 hover:border-emerald-500/40 text-slate-200'
+          }`}
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+              <Brain className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-white truncate">
+                Como Estudar (Ciclo 15 min)
+              </p>
+              <p className="text-[11px] text-slate-400 truncate">
+                Passo a passo do método de fluência
+              </p>
+            </div>
+          </div>
+          <span className="text-xs font-bold text-emerald-300 shrink-0">
+            {showMethodSection ? 'Fechar ▲' : 'Ver Guia ▼'}
+          </span>
+        </button>
+      </div>
+
+      {/* Laboratório Rápido de Frases & Correção Instantânea (Recolhível) */}
+      {showLabSection && (
+        <div className="bg-slate-900/90 border border-indigo-500/40 rounded-2xl p-5 sm:p-6 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                <Wand2 className="w-4 h-4 text-indigo-400" />
+                Laboratório Rápido: Teste ou Corrija uma Frase em Inglês
+              </h3>
+              <p className="text-xs text-slate-400">
+                Digite ou fale qualquer frase que queira usar no trabalho ou viagem para ouvir a pronúncia no sotaque escolhido e checar se soa natural.
+              </p>
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() =>
-                labInput.trim() &&
-                speakText(labInput, { rate: 0.95, accent: preferredAccent })
-              }
-              className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5 border border-slate-700"
-            >
-              <Volume2 className="w-4 h-4 text-indigo-400" />
-              Ouvir
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-600/20"
-            >
-              <Sparkles className="w-4 h-4" />
-              Analisar Frase
-            </button>
-          </div>
-        </form>
+          <form
+            onSubmit={handleAnalyzeLabSentence}
+            className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2"
+          >
+            <div className="flex items-center gap-2 flex-1">
+              <button
+                type="button"
+                onClick={handleLabMic}
+                className={`p-2.5 rounded-xl border transition shrink-0 ${
+                  isLabRecording
+                    ? 'bg-rose-600 border-rose-400 text-white animate-pulse'
+                    : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-indigo-500'
+                }`}
+                title="Falar frase pelo microfone"
+              >
+                {isLabRecording ? (
+                  <MicOff className="w-4 h-4" />
+                ) : (
+                  <Mic className="w-4 h-4" />
+                )}
+              </button>
+              <input
+                type="text"
+                value={labInput}
+                onChange={(e) => setLabInput(e.target.value)}
+                placeholder='Ex: "I have a doubt about the meeting" ou "I want a coffee"'
+                className="flex-1 px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs sm:text-sm text-white focus:outline-none focus:border-indigo-500"
+              />
+            </div>
 
-        {labAnalysis && (
-          <div className="p-4 rounded-xl bg-slate-950/90 border border-indigo-500/30 space-y-2.5 text-xs">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="font-bold text-indigo-300 text-sm">
-                {labAnalysis.title}
-              </span>
+            <div className="grid grid-cols-2 sm:flex items-center gap-2">
               <button
                 type="button"
                 onClick={() =>
-                  speakText(labAnalysis.betterWay, {
-                    rate: 0.95,
-                    accent: preferredAccent,
-                  })
+                  labInput.trim() &&
+                  speakText(labInput, { rate: 0.95, accent: preferredAccent })
                 }
-                className="px-2.5 py-1 rounded-lg bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600/30 font-semibold flex items-center gap-1"
+                className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5 border border-slate-700"
               >
-                <Volume2 className="w-3.5 h-3.5" />
-                Ouvir versão natural
+                <Volume2 className="w-4 h-4 text-indigo-400" />
+                Ouvir
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-600/20"
+              >
+                <Sparkles className="w-4 h-4" />
+                Analisar Frase
               </button>
             </div>
-            <p className="text-slate-300 leading-relaxed">
-              {labAnalysis.explanation}
-            </p>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-xl bg-slate-900 border border-slate-800">
-              <div>
-                <span className="text-[11px] text-slate-400 block">
-                  Forma natural recomendada:
+          </form>
+
+          {labAnalysis && (
+            <div className="p-4 rounded-xl bg-slate-950/90 border border-indigo-500/30 space-y-2.5 text-xs">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-bold text-indigo-300 text-sm">
+                  {labAnalysis.title}
                 </span>
-                <span className="text-sm font-extrabold text-emerald-300">
-                  “{labAnalysis.betterWay}”
-                </span>
-              </div>
-              {onAddFlashcard && (
                 <button
                   type="button"
                   onClick={() =>
-                    onAddFlashcard(
-                      labAnalysis.vocabToSave || {
-                        word: labAnalysis.betterWay,
-                        phonetic: '/Expressão Natural/',
-                        translation: 'Frase natural revisada no Laboratório',
-                        example: labAnalysis.betterWay,
-                        deck: 'Laboratório de Frases',
-                        level: 'B1-B2',
-                      }
-                    )
+                    speakText(labAnalysis.betterWay, {
+                      rate: 0.95,
+                      accent: preferredAccent,
+                    })
                   }
-                  className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 shrink-0"
+                  className="px-2.5 py-1 rounded-lg bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600/30 font-semibold flex items-center gap-1"
                 >
-                  <Plus className="w-3.5 h-3.5" />
-                  Salvar nos Flashcards (+10 XP)
+                  <Volume2 className="w-3.5 h-3.5" />
+                  Ouvir versão natural
                 </button>
-              )}
+              </div>
+              <p className="text-slate-300 leading-relaxed">
+                {labAnalysis.explanation}
+              </p>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-xl bg-slate-900 border border-slate-800">
+                <div>
+                  <span className="text-[11px] text-slate-400 block">
+                    Forma natural recomendada:
+                  </span>
+                  <span className="text-sm font-extrabold text-emerald-300">
+                    “{labAnalysis.betterWay}”
+                  </span>
+                </div>
+                {onAddFlashcard && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onAddFlashcard(
+                        labAnalysis.vocabToSave || {
+                          word: labAnalysis.betterWay,
+                          phonetic: '/Expressão Natural/',
+                          translation: 'Frase natural revisada no Laboratório',
+                          example: labAnalysis.betterWay,
+                          deck: 'Laboratório de Frases',
+                          level: 'B1-B2',
+                        }
+                      )
+                    }
+                    className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 shrink-0"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Salvar nos Flashcards (+10 XP)
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
-      {/* Roteiro Recomendado de 15 Minutos */}
-      <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-6">
-        <h3 className="text-sm font-bold uppercase tracking-wider text-indigo-400 mb-4">
-          ⚡ Ciclo Diário de Fluência (15 min/dia)
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
-          <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800/80 flex items-start gap-3">
-            <CheckCircle2 className="w-5 h-5 text-indigo-400 shrink-0" />
-            <div>
-              <p className="font-bold text-white mb-0.5">
-                1. Blocos em Contexto
-              </p>
-              <p className="text-slate-400">
-                Leia um texto curto e salve expressões completas em vez de palavras isoladas.
-              </p>
+      {/* Roteiro Recomendado de 15 Minutos (Recolhível) */}
+      {showMethodSection && (
+        <div className="bg-slate-900/70 border border-emerald-500/40 rounded-2xl p-6">
+          <h3 className="text-sm font-bold uppercase tracking-wider text-emerald-400 mb-4">
+            ⚡ Ciclo Diário de Fluência (15 min/dia)
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
+            <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800/80 flex items-start gap-3">
+              <CheckCircle2 className="w-5 h-5 text-indigo-400 shrink-0" />
+              <div>
+                <p className="font-bold text-white mb-0.5">
+                  1. Blocos em Contexto
+                </p>
+                <p className="text-slate-400">
+                  Leia um texto curto e salve expressões completas em vez de palavras isoladas.
+                </p>
+              </div>
             </div>
-          </div>
-          <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800/80 flex items-start gap-3">
-            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-            <div>
-              <p className="font-bold text-white mb-0.5">
-                2. Recuperação Ativa
-              </p>
-              <p className="text-slate-400">
-                Tente produzir a frase em inglês com pistas graduais antes de revelar a resposta.
-              </p>
+            <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800/80 flex items-start gap-3">
+              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+              <div>
+                <p className="font-bold text-white mb-0.5">
+                  2. Recuperação Ativa
+                </p>
+                <p className="text-slate-400">
+                  Tente produzir a frase em inglês com pistas graduais antes de revelar a resposta.
+                </p>
+              </div>
             </div>
-          </div>
-          <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800/80 flex items-start gap-3">
-            <CheckCircle2 className="w-5 h-5 text-rose-400 shrink-0" />
-            <div>
-              <p className="font-bold text-white mb-0.5">
-                3. Técnica Shadowing
-              </p>
-              <p className="text-slate-400">
-                Ouça em `1.0x` ou `0.75x`, repita no microfone e compare sua pronúncia palavra por palavra.
-              </p>
+            <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800/80 flex items-start gap-3">
+              <CheckCircle2 className="w-5 h-5 text-rose-400 shrink-0" />
+              <div>
+                <p className="font-bold text-white mb-0.5">
+                  3. Técnica Shadowing
+                </p>
+                <p className="text-slate-400">
+                  Ouça em `0.55x` ou `1.0x`, repita no microfone e compare sua pronúncia palavra por palavra.
+                </p>
+              </div>
             </div>
-          </div>
-          <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800/80 flex items-start gap-3">
-            <CheckCircle2 className="w-5 h-5 text-amber-400 shrink-0" />
-            <div>
-              <p className="font-bold text-white mb-0.5">
-                4. Aplicação no Roleplay
-              </p>
-              <p className="text-slate-400">
-                Use as expressões aprendidas conversando nos cenários interativos com IA.
-              </p>
+            <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800/80 flex items-start gap-3">
+              <CheckCircle2 className="w-5 h-5 text-amber-400 shrink-0" />
+              <div>
+                <p className="font-bold text-white mb-0.5">
+                  4. Aplicação no Roleplay
+                </p>
+                <p className="text-slate-400">
+                  Use as expressões aprendidas conversando nos cenários interativos com IA.
+                </p>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Modal de Card de Conquista Compartilhável */}
       {showShareModal && (

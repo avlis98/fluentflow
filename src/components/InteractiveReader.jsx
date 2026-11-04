@@ -18,6 +18,11 @@ import {
   X,
   FilePlus2,
   Trash2,
+  Search,
+  Download,
+  Loader2,
+  Music,
+  Newspaper,
 } from 'lucide-react';
 import { INTERACTIVE_TEXTS, COMMON_DICTIONARY } from '../data/content';
 import {
@@ -67,8 +72,14 @@ export default function InteractiveReader({
   const [quizAnswers, setQuizAnswers] = useState({});
   const [quizSubmitted, setQuizSubmitted] = useState(false);
 
-  // Modal de Importar Música / Texto Próprio
+  // Modal de Importar Música / Texto Próprio + Busca na Web
   const [showImportModal, setShowImportModal] = useState(false);
+  const [importTab, setImportTab] = useState('music'); // 'music' | 'article' | 'manual'
+  const [webSearchQuery, setWebSearchQuery] = useState('');
+  const [webSearchResults, setWebSearchResults] = useState([]);
+  const [isSearchingWeb, setIsSearchingWeb] = useState(false);
+  const [webSearchError, setWebSearchError] = useState('');
+  const [importingItemId, setImportingItemId] = useState(null);
   const [newTitle, setNewTitle] = useState('');
   const [newCategory, setNewCategory] = useState('Música / Letra');
   const [newLevel, setNewLevel] = useState('B1-B2');
@@ -456,6 +467,274 @@ export default function InteractiveReader({
     setNewPortugueseRaw('');
   };
 
+  const translateLineToPt = async (line) => {
+    try {
+      const clean = line.replace(/🎵/g, '').trim();
+      if (!clean) return '';
+      const res = await fetch(
+        `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=pt&dt=t&q=${encodeURIComponent(
+          clean
+        )}`
+      );
+      const data = await res.json();
+      const joined = Array.isArray(data?.[0])
+        ? data[0].map((part) => part?.[0] || '').join('')
+        : '';
+      return joined.trim() || clean;
+    } catch {
+      return 'Toque em qualquer palavra desta linha para ouvir a pronúncia e ver a tradução.';
+    }
+  };
+
+  const handleSearchWebContent = async (e, overrideQuery) => {
+    if (e) e.preventDefault();
+    const query = (overrideQuery ?? webSearchQuery).trim();
+    if (!query) return;
+    if (overrideQuery) setWebSearchQuery(overrideQuery);
+
+    setIsSearchingWeb(true);
+    setWebSearchError('');
+    setWebSearchResults([]);
+
+    try {
+      if (importTab === 'music') {
+        const res = await fetch(
+          `https://lrclib.net/api/search?q=${encodeURIComponent(query)}`
+        );
+        const data = await res.json();
+        const valid = (Array.isArray(data) ? data : []).filter(
+          (item) => item.plainLyrics && item.plainLyrics.trim().length > 40
+        );
+        const seen = new Set();
+        const unique = [];
+        for (const item of valid) {
+          const key = `${item.trackName}-${item.artistName}`.toLowerCase();
+          if (!seen.has(key)) {
+            seen.add(key);
+            unique.push(item);
+          }
+          if (unique.length >= 8) break;
+        }
+        if (unique.length === 0) {
+          setWebSearchError(
+            'Nenhuma letra encontrada com esse termo. Tente digitar o nome da música e o cantor (ex: "Coldplay Yellow").'
+          );
+        } else {
+          setWebSearchResults(unique);
+        }
+      } else if (importTab === 'article') {
+        // Traduz o termo para inglês caso o aluno tenha digitado em português
+        let enQuery = query;
+        try {
+          const trRes = await fetch(
+            `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=${encodeURIComponent(
+              query
+            )}`
+          );
+          const trData = await trRes.json();
+          const translatedQ = trData?.[0]?.[0]?.[0]?.trim();
+          if (translatedQ) enQuery = translatedQ;
+        } catch {
+          // Mantém query original
+        }
+
+        const wikiUrl = `https://simple.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(
+          enQuery
+        )}&utf8=1&format=json&origin=*`;
+        const res = await fetch(wikiUrl);
+        const data = await res.json();
+        let results = data?.query?.search || [];
+
+        if (results.length === 0) {
+          const fallbackUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(
+            enQuery
+          )}&utf8=1&format=json&origin=*`;
+          const fbRes = await fetch(fallbackUrl);
+          const fbData = await fbRes.json();
+          results = (fbData?.query?.search || []).map((r) => ({
+            ...r,
+            wikiLang: 'en',
+          }));
+        } else {
+          results = results.map((r) => ({ ...r, wikiLang: 'simple' }));
+        }
+
+        if (results.length === 0) {
+          setWebSearchError(
+            'Nenhum texto encontrado sobre esse tema. Tente outro assunto (ex: "Coffee", "London", "Music").'
+          );
+        } else {
+          setWebSearchResults(results.slice(0, 6));
+        }
+      }
+    } catch {
+      setWebSearchError(
+        'Não foi possível conectar à busca agora. Verifique sua conexão com a internet.'
+      );
+    }
+    setIsSearchingWeb(false);
+  };
+
+  const handleImportSongFromWeb = async (song, editFirst = false) => {
+    setImportingItemId(song.id);
+    try {
+      const rawLines = String(song.plainLyrics || '')
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter((l) => l && !/^\[.*\]$/.test(l));
+
+      // Agrupa de 2 em 2 versos para criar estrofes confortáveis de ouvir e repetir
+      const stanzas = [];
+      for (let i = 0; i < rawLines.length && stanzas.length < 14; i += 2) {
+        const pair = rawLines.slice(i, i + 2).join(' / ');
+        stanzas.push(`🎵 ${pair}`);
+      }
+
+      const translatedStanzas = await Promise.all(
+        stanzas.map((stanza) => translateLineToPt(stanza))
+      );
+
+      const fullTitle = `${song.trackName} — ${song.artistName}`;
+
+      if (editFirst) {
+        setNewTitle(fullTitle);
+        setNewEmoji('🎵');
+        setNewCategory('Música Importada da Web');
+        setNewLevel('B1-B2');
+        setNewEnglishRaw(stanzas.join('\n'));
+        setNewPortugueseRaw(translatedStanzas.join('\n'));
+        setImportTab('manual');
+        setImportingItemId(null);
+        return;
+      }
+
+      const paragraphs = stanzas.map((enLine, idx) => ({
+        en: enLine,
+        pt: `🎵 ${translatedStanzas[idx] || ''}`,
+      }));
+
+      const created = {
+        id: `custom-song-${Date.now()}`,
+        isCustom: true,
+        title: fullTitle,
+        subtitle: `Letra importada da internet • Salva no seu celular`,
+        category: 'Música & Pronúncia',
+        level: 'B1-B2',
+        accent: preferredAccent || 'en-US',
+        duration: `${Math.max(2, Math.ceil(stanzas.length / 3))} min`,
+        coverEmoji: '🎵',
+        paragraphs,
+        vocabulary: {},
+        quiz: [],
+      };
+
+      if (onAddCustomText) {
+        onAddCustomText(created);
+      }
+      setActiveTextId(created.id);
+      setShowImportModal(false);
+    } finally {
+      setImportingItemId(null);
+    }
+  };
+
+  const handleImportArticleFromWeb = async (article) => {
+    setImportingItemId(article.pageid);
+    try {
+      const host =
+        article.wikiLang === 'en' ? 'en.wikipedia.org' : 'simple.wikipedia.org';
+      const url = `https://${host}/w/api.php?action=query&prop=extracts&exintro=1&explaintext=1&pageids=${article.pageid}&format=json&origin=*`;
+      const res = await fetch(url);
+      const data = await res.json();
+      const page = data?.query?.pages?.[article.pageid];
+      const extract = String(page?.extract || '').trim();
+
+      const rawParagraphs = extract
+        .split(/\r?\n+/)
+        .map((p) => p.trim())
+        .filter((p) => p.length > 35)
+        .slice(0, 6);
+
+      // Se o artigo tiver um único bloco grande, divide em frases de 2 em 2
+      let finalEnParagraphs = rawParagraphs;
+      if (rawParagraphs.length === 1) {
+        const sentences =
+          rawParagraphs[0].match(/[^.!?]+[.!?]+/g)?.map((s) => s.trim()) || [
+            rawParagraphs[0],
+          ];
+        finalEnParagraphs = [];
+        for (let i = 0; i < sentences.length && finalEnParagraphs.length < 5; i += 2) {
+          finalEnParagraphs.push(sentences.slice(i, i + 2).join(' '));
+        }
+      }
+
+      const translatedParagraphs = await Promise.all(
+        finalEnParagraphs.map((p) => translateLineToPt(p))
+      );
+
+      const created = {
+        id: `custom-wiki-${Date.now()}`,
+        isCustom: true,
+        title: article.title,
+        subtitle: 'Artigo importado da internet • Salvo no seu celular',
+        category: 'Leitura da Web',
+        level: article.wikiLang === 'simple' ? 'A1-A2' : 'B1-B2',
+        accent: preferredAccent || 'en-US',
+        duration: `${Math.max(2, finalEnParagraphs.length)} min`,
+        coverEmoji: '📰',
+        paragraphs: finalEnParagraphs.map((en, idx) => ({
+          en,
+          pt: translatedParagraphs[idx] || '',
+        })),
+        vocabulary: {},
+        quiz: [],
+      };
+
+      if (onAddCustomText) {
+        onAddCustomText(created);
+      }
+      setActiveTextId(created.id);
+      setShowImportModal(false);
+    } finally {
+      setImportingItemId(null);
+    }
+  };
+
+  const handleDownloadTextToPhone = (textToSave = activeText) => {
+    if (!textToSave) return;
+    const lines = [
+      '====================================================',
+      `FLUENTFLOW — APOSTILA DE ESTUDO NO CELULAR`,
+      `Título: ${textToSave.title}`,
+      `Categoria: ${textToSave.category} | Nível: ${textToSave.level}`,
+      '====================================================',
+      '',
+    ];
+
+    textToSave.paragraphs.forEach((p, idx) => {
+      lines.push(`[Trecho ${idx + 1}]`);
+      lines.push(`🇺🇸 Inglês: ${p.en}`);
+      lines.push(`🗣️ Pronúncia: ${generatePortuguesePhonetics(p.en)}`);
+      lines.push(`🇧🇷 Tradução: ${p.pt}`);
+      lines.push('');
+    });
+
+    const content = lines.join('\n');
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const safeName = textToSave.title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+    link.href = url;
+    link.download = `fluentflow-${safeName || 'estudo'}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const handleQuizSubmit = () => {
     setQuizSubmitted(true);
     if (!completedTexts.includes(activeText.id)) {
@@ -697,10 +976,10 @@ export default function InteractiveReader({
               <p className="text-xs sm:text-sm text-slate-400">{activeText.subtitle}</p>
             </div>
 
-            <div className="grid grid-cols-2 sm:flex items-center gap-2 w-full sm:w-auto">
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
               <button
                 onClick={handlePlayAll}
-                className={`px-3 sm:px-4 py-2.5 rounded-xl font-semibold text-xs sm:text-sm flex items-center justify-center gap-1.5 sm:gap-2 transition shadow-lg ${
+                className={`flex-1 sm:flex-initial px-3.5 py-2.5 rounded-xl font-semibold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition shadow-lg ${
                   playingParagraphIdx !== null
                     ? 'bg-rose-600 hover:bg-rose-500 text-white'
                     : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/20'
@@ -720,9 +999,18 @@ export default function InteractiveReader({
               </button>
 
               <button
+                onClick={() => handleDownloadTextToPhone(activeText)}
+                className="px-3 py-2.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 transition text-xs font-semibold flex items-center justify-center gap-1.5"
+                title="Baixar letra/texto com pronúncia e tradução no seu celular"
+              >
+                <Download className="w-4 h-4 shrink-0" />
+                <span>Salvar no Celular</span>
+              </button>
+
+              <button
                 onClick={() => setShowTranslations((prev) => !prev)}
                 className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition text-xs font-medium flex items-center justify-center gap-1.5"
-                title="Mostrar/ocultar tradução linha a linha"
+                title="Mostrar/ocultar pronúncia e tradução"
               >
                 {showTranslations ? (
                   <>
@@ -813,170 +1101,155 @@ export default function InteractiveReader({
                       : 'bg-slate-950/40 border-slate-800/80 hover:border-slate-700/80'
                   }`}
                 >
-                  <div className="flex items-start gap-3 min-w-0">
-                    <div className="flex flex-col gap-1.5 shrink-0 mt-1">
+                  <div className="space-y-2.5 min-w-0">
+                    <p className="text-base sm:text-lg leading-relaxed text-slate-100 font-medium break-words">
+                      {hasMusicNote && (
+                        <span className="mr-1.5 select-none" aria-hidden="true">
+                          🎵
+                        </span>
+                      )}
+                      {tokens.map((token, tIdx) => {
+                        const clean = token
+                          .toLowerCase()
+                          .replace(/’/g, "'")
+                          .replace(/[^a-z'-]/g, '')
+                          .replace(/^-+|-+$/g, '');
+                        const stripped = clean.replace(/[^a-z']/g, '');
+                        const isHighlighted = Boolean(
+                          activeText.vocabulary?.[clean] ||
+                            activeText.vocabulary?.[stripped]
+                        );
+                        const selectedTokens = selectedWordInfo
+                          ? selectedWordInfo.word
+                              .toLowerCase()
+                              .replace(/’/g, "'")
+                              .split(/\s+/)
+                          : [];
+                        const isSelectedWord =
+                          Boolean(clean) &&
+                          (selectedTokens.includes(clean) ||
+                            selectedTokens.includes(stripped));
+
+                        const shadowWordStatus =
+                          shadowEval?.wordAnalysis?.[tIdx]?.status;
+                        const isKaraokeActive =
+                          isPlayingThis && activeParaWordIdx === tIdx;
+
+                        return (
+                          <React.Fragment key={tIdx}>
+                            <span
+                              onClick={() =>
+                                handleWordClick(token, para.en, para.pt)
+                              }
+                              className={`cursor-pointer rounded px-0.5 transition-colors ${
+                                isKaraokeActive
+                                  ? 'bg-emerald-400 text-slate-950'
+                                  : shadowWordStatus === 'correct'
+                                  ? 'bg-emerald-500/25 text-emerald-200'
+                                  : shadowWordStatus === 'close'
+                                  ? 'bg-amber-500/25 text-amber-200'
+                                  : shadowWordStatus === 'missed'
+                                  ? 'bg-rose-500/25 text-rose-200 underline decoration-rose-400/80 underline-offset-4'
+                                  : isSelectedWord
+                                  ? 'bg-indigo-500 text-white'
+                                  : isHighlighted
+                                  ? 'text-indigo-300 underline decoration-indigo-400/70 decoration-dotted underline-offset-4 hover:bg-indigo-500/20'
+                                  : 'hover:bg-slate-800 hover:text-indigo-200'
+                              }`}
+                            >
+                              {token}
+                            </span>{' '}
+                          </React.Fragment>
+                        );
+                      })}
+                    </p>
+
+                    {showTranslations && (
+                      <div className="space-y-1 border-l-2 border-slate-700 pl-3 min-w-0">
+                        <p className="text-xs font-medium text-amber-300/90 break-words">
+                          🗣️ Como soa: “{generatePortuguesePhonetics(para.en)}”
+                        </p>
+                        <p className="text-sm text-slate-400 break-words">
+                          {para.pt}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Barra unificada e limpa de ações do parágrafo */}
+                    <div className="pt-1 flex flex-wrap items-center gap-1.5 sm:gap-2 text-[11px]">
                       <button
+                        type="button"
                         onClick={() => handlePlayParagraph(pIdx)}
-                        className={`p-2 rounded-lg transition ${
+                        className={`px-2.5 py-1.5 rounded-lg font-semibold flex items-center gap-1 border transition ${
                           isPlayingThis
-                            ? 'bg-indigo-600 text-white'
-                            : 'bg-slate-800/90 text-slate-300 hover:bg-indigo-600 hover:text-white'
+                            ? 'bg-indigo-600 border-indigo-500 text-white'
+                            : 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-200'
                         }`}
-                        title="Ouvir este trecho"
                       >
-                        <Volume2 className="w-4 h-4" />
+                        <Volume2 className="w-3.5 h-3.5 text-indigo-400" />
+                        {isPlayingThis ? 'Ouvindo...' : 'Ouvir'}
                       </button>
 
                       <button
+                        type="button"
+                        onClick={() => handlePlayParagraph(pIdx, 0.55)}
+                        className="px-2.5 py-1.5 rounded-lg bg-emerald-950/70 hover:bg-emerald-900 text-emerald-200 border border-emerald-500/30 font-semibold"
+                      >
+                        🐢 0.55x
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handlePlayParagraph(pIdx, 0.65, true)}
+                        className="px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-indigo-300 border border-slate-800 font-semibold"
+                      >
+                        🔍 Pausado
+                      </button>
+
+                      <button
+                        type="button"
                         onClick={() =>
                           handleToggleParagraphShadowing(pIdx, para.en)
                         }
-                        className={`p-2 rounded-lg transition ${
+                        className={`px-2.5 py-1.5 rounded-lg font-semibold flex items-center gap-1 border transition ${
                           isShadowingThis
-                            ? 'bg-rose-600 text-white animate-pulse'
-                            : 'bg-slate-800/90 text-amber-300 hover:bg-amber-600 hover:text-white'
+                            ? 'bg-rose-600 border-rose-500 text-white animate-pulse'
+                            : 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-amber-300'
                         }`}
-                        title="Praticar Shadowing (repetir no microfone)"
                       >
                         {isShadowingThis ? (
-                          <MicOff className="w-4 h-4" />
+                          <MicOff className="w-3.5 h-3.5" />
                         ) : (
-                          <Mic className="w-4 h-4" />
+                          <Mic className="w-3.5 h-3.5" />
                         )}
+                        {isShadowingThis
+                          ? 'Parar Microfone'
+                          : 'Falar no Microfone'}
                       </button>
                     </div>
 
-                    <div className="space-y-2 flex-1 min-w-0">
-                      <p className="text-base sm:text-lg leading-relaxed text-slate-100 font-medium break-words">
-                        {hasMusicNote && (
-                          <span className="mr-1.5 select-none" aria-hidden="true">
-                            🎵
+                    {shadowEval && (
+                      <div className="p-3 rounded-xl bg-slate-900/95 border border-slate-800 text-xs space-y-1.5 min-w-0">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="font-bold text-emerald-400">
+                            🎙️ Precisão do Shadowing: {shadowEval.accuracy}%
                           </span>
-                        )}
-                        {tokens.map((token, tIdx) => {
-                          const clean = token
-                            .toLowerCase()
-                            .replace(/’/g, "'")
-                            .replace(/[^a-z'-]/g, '')
-                            .replace(/^-+|-+$/g, '');
-                          const stripped = clean.replace(/[^a-z']/g, '');
-                          const isHighlighted = Boolean(
-                            activeText.vocabulary?.[clean] ||
-                              activeText.vocabulary?.[stripped]
-                          );
-                          const selectedTokens = selectedWordInfo
-                            ? selectedWordInfo.word
-                                .toLowerCase()
-                                .replace(/’/g, "'")
-                                .split(/\s+/)
-                            : [];
-                          const isSelectedWord =
-                            Boolean(clean) &&
-                            (selectedTokens.includes(clean) ||
-                              selectedTokens.includes(stripped));
-
-                          const shadowWordStatus =
-                            shadowEval?.wordAnalysis?.[tIdx]?.status;
-                          const isKaraokeActive =
-                            isPlayingThis && activeParaWordIdx === tIdx;
-
-                          return (
-                            <React.Fragment key={tIdx}>
-                              <span
-                                onClick={() =>
-                                  handleWordClick(token, para.en, para.pt)
-                                }
-                                className={`cursor-pointer rounded px-0.5 transition-colors ${
-                                  isKaraokeActive
-                                    ? 'bg-emerald-400 text-slate-950'
-                                    : shadowWordStatus === 'correct'
-                                    ? 'bg-emerald-500/25 text-emerald-200'
-                                    : shadowWordStatus === 'close'
-                                    ? 'bg-amber-500/25 text-amber-200'
-                                    : shadowWordStatus === 'missed'
-                                    ? 'bg-rose-500/25 text-rose-200 underline decoration-rose-400/80 underline-offset-4'
-                                    : isSelectedWord
-                                    ? 'bg-indigo-500 text-white'
-                                    : isHighlighted
-                                    ? 'text-indigo-300 underline decoration-indigo-400/70 decoration-dotted underline-offset-4 hover:bg-indigo-500/20'
-                                    : 'hover:bg-slate-800 hover:text-indigo-200'
-                                }`}
-                              >
-                                {token}
-                              </span>{' '}
-                            </React.Fragment>
-                          );
-                        })}
-                      </p>
-
-                      {showTranslations && (
-                        <div className="space-y-1 border-l-2 border-slate-700 pl-3 min-w-0">
-                          <p className="text-xs font-medium text-amber-300/90 break-words">
-                            🗣️ Como soa: “{generatePortuguesePhonetics(para.en)}”
-                          </p>
-                          <p className="text-sm text-slate-400 break-words">
-                            {para.pt}
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Barra de ações rápidas do parágrafo (Shadowing lento + feedback) */}
-                      <div className="pt-1 flex flex-wrap items-center gap-2 text-[11px]">
-                        <button
-                          type="button"
-                          onClick={() => handlePlayParagraph(pIdx, 0.55)}
-                          className="px-2.5 py-1 rounded-lg bg-emerald-950/70 hover:bg-emerald-900 text-emerald-200 border border-emerald-500/30 font-semibold"
-                        >
-                          🐢 Bem Lento (0.55x)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handlePlayParagraph(pIdx, 0.65, true)}
-                          className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-indigo-300 border border-slate-800 font-semibold"
-                        >
-                          🔍 Palavra por Palavra
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleToggleParagraphShadowing(pIdx, para.en)
-                          }
-                          className={`px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1 border ${
-                            isShadowingThis
-                              ? 'bg-rose-600/30 border-rose-500 text-rose-200'
-                              : 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-amber-300'
-                          }`}
-                        >
-                          <AudioWaveform className="w-3.5 h-3.5" />
-                          {isShadowingThis
-                            ? 'Finalizar Gravação'
-                            : 'Treinar Shadowing'}
-                        </button>
-                      </div>
-
-                      {shadowEval && (
-                        <div className="p-3 rounded-xl bg-slate-900/95 border border-slate-800 text-xs space-y-1.5 min-w-0">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <span className="font-bold text-emerald-400">
-                              🎙️ Precisão do Shadowing: {shadowEval.accuracy}%
+                          {isShadowingThis && (
+                            <span className="text-[11px] text-rose-300 font-semibold animate-pulse">
+                              ● Ouvindo sua voz... toque em "Parar Microfone" ao terminar
                             </span>
-                            {isShadowingThis && (
-                              <span className="text-[11px] text-rose-300 font-semibold animate-pulse">
-                                ● Ouvindo sua voz... clique no microfone ao terminar
-                              </span>
-                            )}
-                          </div>
-                          {shadowEval.transcript && (
-                            <p className="text-slate-400 italic break-words">
-                              Você disse: “{shadowEval.transcript}”
-                            </p>
                           )}
-                          <p className="text-slate-300 break-words">
-                            {shadowEval.feedback}
-                          </p>
                         </div>
-                      )}
-                    </div>
+                        {shadowEval.transcript && (
+                          <p className="text-slate-400 italic break-words">
+                            Você disse: “{shadowEval.transcript}”
+                          </p>
+                        )}
+                        <p className="text-slate-300 break-words">
+                          {shadowEval.feedback}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -1174,14 +1447,14 @@ export default function InteractiveReader({
         </div>
       )}
 
-      {/* Modal de Importar Música, Artigo ou Diálogo Próprio */}
+      {/* Modal de Buscar na Internet ou Colar Música/Texto */}
       {showImportModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-xl w-full max-h-[90dvh] overflow-y-auto p-5 sm:p-6 space-y-4 shadow-2xl">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-2xl w-full max-h-[90dvh] overflow-y-auto p-5 sm:p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between">
               <h3 className="text-base sm:text-lg font-extrabold text-white flex items-center gap-2">
                 <FilePlus2 className="w-5 h-5 text-emerald-400" />
-                Colar Minha Música, Texto ou Diálogo
+                Adicionar Música ou Texto ao App
               </h3>
               <button
                 onClick={() => setShowImportModal(false)}
@@ -1191,113 +1464,358 @@ export default function InteractiveReader({
               </button>
             </div>
 
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Cole qualquer letra de música, trecho de livro, notícia ou roteiro em inglês. O FluentFlow transformará cada linha/parágrafo em áudio interativo (`1.0x` e `0.75x`), dicionário ao toque e treino de **Shadowing**!
-            </p>
+            {/* Abas: Buscar Música | Buscar Texto | Colar Manualmente */}
+            <div className="grid grid-cols-3 gap-1.5 p-1 rounded-2xl bg-slate-950 border border-slate-800">
+              <button
+                type="button"
+                onClick={() => {
+                  setImportTab('music');
+                  setWebSearchResults([]);
+                  setWebSearchError('');
+                }}
+                className={`py-2 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition ${
+                  importTab === 'music'
+                    ? 'bg-indigo-600 text-white shadow'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Music className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">Buscar Música</span>
+              </button>
 
-            <form onSubmit={handleCreateCustomTextSubmit} className="space-y-3.5">
-              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-                <div className="sm:col-span-6">
+              <button
+                type="button"
+                onClick={() => {
+                  setImportTab('article');
+                  setWebSearchResults([]);
+                  setWebSearchError('');
+                }}
+                className={`py-2 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition ${
+                  importTab === 'article'
+                    ? 'bg-indigo-600 text-white shadow'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Newspaper className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">Buscar Texto</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setImportTab('manual')}
+                className={`py-2 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition ${
+                  importTab === 'manual'
+                    ? 'bg-indigo-600 text-white shadow'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <FilePlus2 className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">Colar Texto</span>
+              </button>
+            </div>
+
+            {/* ABA 1 e 2: BUSCA NA INTERNET (MÚSICAS OU ARTIGOS) */}
+            {(importTab === 'music' || importTab === 'article') && (
+              <div className="space-y-4">
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  {importTab === 'music'
+                    ? 'Pesquise qualquer música em inglês na internet. O FluentFlow importa a letra, traduz para o português, gera a pronúncia escrita e salva na biblioteca do seu celular!'
+                    : 'Pesquise qualquer assunto (em português ou inglês). O FluentFlow busca artigos educativos em inglês, traduz parágrafo por parágrafo e salva no seu celular!'}
+                </p>
+
+                <form onSubmit={handleSearchWebContent} className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={webSearchQuery}
+                      onChange={(e) => setWebSearchQuery(e.target.value)}
+                      placeholder={
+                        importTab === 'music'
+                          ? 'Ex: Coldplay Yellow, Beatles Yesterday, Adele...'
+                          : 'Ex: Café, Viagem, Nova York, Inteligência Artificial...'
+                      }
+                      className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs sm:text-sm text-white focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isSearchingWeb || !webSearchQuery.trim()}
+                    className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-xs sm:text-sm font-bold flex items-center gap-1.5 shrink-0"
+                  >
+                    {isSearchingWeb ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Search className="w-4 h-4" />
+                    )}
+                    <span>Buscar</span>
+                  </button>
+                </form>
+
+                {/* Sugestões rápidas de 1 toque */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[11px] text-slate-500">Sugestões:</span>
+                  {(importTab === 'music'
+                    ? [
+                        'Coldplay Yellow',
+                        'The Beatles Yesterday',
+                        'Ed Sheeran Perfect',
+                        'John Lennon Imagine',
+                        'Adele Someone Like You',
+                      ]
+                    : [
+                        'Coffee',
+                        'New York City',
+                        'London',
+                        'Technology',
+                        'Cinema',
+                      ]
+                  ).map((sug) => (
+                    <button
+                      key={sug}
+                      type="button"
+                      onClick={() => handleSearchWebContent(null, sug)}
+                      className="text-[11px] px-2.5 py-1 rounded-full bg-slate-950 hover:bg-slate-800 text-indigo-300 border border-slate-800 transition"
+                    >
+                      {sug}
+                    </button>
+                  ))}
+                </div>
+
+                {webSearchError && (
+                  <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-500/30 text-xs text-rose-200">
+                    {webSearchError}
+                  </div>
+                )}
+
+                {isSearchingWeb && (
+                  <div className="py-8 text-center text-slate-400 text-xs flex flex-col items-center gap-2">
+                    <Loader2 className="w-6 h-6 text-indigo-400 animate-spin" />
+                    <span>Pesquisando na internet...</span>
+                  </div>
+                )}
+
+                {!isSearchingWeb && webSearchResults.length > 0 && (
+                  <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                    {importTab === 'music'
+                      ? webSearchResults.map((song) => {
+                          const isImportingThis = importingItemId === song.id;
+                          const preview = String(song.plainLyrics || '')
+                            .split(/\r?\n/)
+                            .filter(Boolean)
+                            .slice(0, 2)
+                            .join(' / ');
+                          return (
+                            <div
+                              key={song.id}
+                              className="p-3.5 rounded-2xl bg-slate-950/90 border border-slate-800 hover:border-indigo-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                            >
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-bold text-white truncate">
+                                  🎵 {song.trackName}
+                                </p>
+                                <p className="text-xs text-indigo-300 truncate">
+                                  {song.artistName}
+                                  {song.albumName ? ` • ${song.albumName}` : ''}
+                                </p>
+                                <p className="text-[11px] text-slate-400 italic truncate mt-1">
+                                  “{preview}...”
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <button
+                                  type="button"
+                                  disabled={Boolean(importingItemId)}
+                                  onClick={() =>
+                                    handleImportSongFromWeb(song, true)
+                                  }
+                                  className="px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
+                                >
+                                  Editar
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={Boolean(importingItemId)}
+                                  onClick={() =>
+                                    handleImportSongFromWeb(song, false)
+                                  }
+                                  className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 shadow"
+                                >
+                                  {isImportingThis ? (
+                                    <>
+                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                      <span>Traduzindo...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Plus className="w-3.5 h-3.5" />
+                                      <span>Levar p/ o App</span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })
+                      : webSearchResults.map((art) => {
+                          const isImportingThis =
+                            importingItemId === art.pageid;
+                          const cleanSnippet = String(art.snippet || '')
+                            .replace(/<[^>]+>/g, '')
+                            .replace(/&quot;/g, '"')
+                            .replace(/&#039;/g, "'");
+                          return (
+                            <div
+                              key={art.pageid}
+                              className="p-3.5 rounded-2xl bg-slate-950/90 border border-slate-800 hover:border-indigo-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                            >
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-bold text-white truncate">
+                                  📰 {art.title}
+                                </p>
+                                <p className="text-[11px] text-slate-400 line-clamp-2 mt-0.5">
+                                  {cleanSnippet}...
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                disabled={Boolean(importingItemId)}
+                                onClick={() => handleImportArticleFromWeb(art)}
+                                className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold flex items-center justify-center gap-1.5 shrink-0 shadow"
+                              >
+                                {isImportingThis ? (
+                                  <>
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    <span>Traduzindo...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Plus className="w-3.5 h-3.5" />
+                                    <span>Levar p/ o App</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          );
+                        })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ABA 3: COLAR MANUALMENTE */}
+            {importTab === 'manual' && (
+              <form
+                onSubmit={handleCreateCustomTextSubmit}
+                className="space-y-3.5"
+              >
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                  <div className="sm:col-span-6">
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                      Título da Música ou Texto *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={newTitle}
+                      onChange={(e) => setNewTitle(e.target.value)}
+                      placeholder="Ex: Coldplay - Yellow / Reunião de Sexta"
+                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs sm:text-sm text-white"
+                    />
+                  </div>
+                  <div className="sm:col-span-3">
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                      Nível
+                    </label>
+                    <select
+                      value={newLevel}
+                      onChange={(e) => setNewLevel(e.target.value)}
+                      className="w-full px-2.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs sm:text-sm text-white"
+                    >
+                      <option value="A1-A2">A1-A2</option>
+                      <option value="B1-B2">B1-B2</option>
+                      <option value="C1-C2">C1-C2</option>
+                    </select>
+                  </div>
+                  <div className="sm:col-span-3">
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                      Ícone
+                    </label>
+                    <select
+                      value={newEmoji}
+                      onChange={(e) => setNewEmoji(e.target.value)}
+                      className="w-full px-2.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs sm:text-sm text-white"
+                    >
+                      <option value="🎵">🎵 Música</option>
+                      <option value="📄">📄 Artigo</option>
+                      <option value="🎬">🎬 Série/Filme</option>
+                      <option value="💼">💼 Trabalho</option>
+                      <option value="✈️">✈️ Viagem</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Título da Música ou Texto *
+                    Letra ou Texto em Inglês (1 frase ou estrofe por linha) *
                   </label>
-                  <input
-                    type="text"
+                  <textarea
+                    rows={4}
                     required
-                    value={newTitle}
-                    onChange={(e) => setNewTitle(e.target.value)}
-                    placeholder="Ex: Coldplay - Yellow / Reunião de Sexta"
+                    value={newEnglishRaw}
+                    onChange={(e) => setNewEnglishRaw(e.target.value)}
+                    placeholder={
+                      'Look at the stars, look how they shine for you\nAnd everything you do, yeah, they were all yellow...'
+                    }
                     className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs sm:text-sm text-white"
                   />
                 </div>
-                <div className="sm:col-span-3">
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Nível
-                  </label>
-                  <select
-                    value={newLevel}
-                    onChange={(e) => setNewLevel(e.target.value)}
-                    className="w-full px-2.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs sm:text-sm text-white"
-                  >
-                    <option value="A1-A2">A1-A2</option>
-                    <option value="B1-B2">B1-B2</option>
-                    <option value="C1-C2">C1-C2</option>
-                  </select>
-                </div>
-                <div className="sm:col-span-3">
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Ícone
-                  </label>
-                  <select
-                    value={newEmoji}
-                    onChange={(e) => setNewEmoji(e.target.value)}
-                    className="w-full px-2.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs sm:text-sm text-white"
-                  >
-                    <option value="🎵">🎵 Música</option>
-                    <option value="📄">📄 Artigo</option>
-                    <option value="🎬">🎬 Série/Filme</option>
-                    <option value="💼">💼 Trabalho</option>
-                    <option value="✈️">✈️ Viagem</option>
-                  </select>
-                </div>
-              </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Letra ou Texto em Inglês (1 frase ou estrofe por linha) *
-                </label>
-                <textarea
-                  rows={4}
-                  required
-                  value={newEnglishRaw}
-                  onChange={(e) => setNewEnglishRaw(e.target.value)}
-                  placeholder={'Look at the stars, look how they shine for you\nAnd everything you do, yeah, they were all yellow...'}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs sm:text-sm text-white"
-                />
-              </div>
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-slate-300">
+                      Tradução em Português (Opcional - 1 por linha)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleAutoTranslateCustomText}
+                      disabled={!newEnglishRaw.trim() || isTranslatingAI}
+                      className="text-[11px] font-bold text-indigo-400 hover:text-indigo-300 disabled:opacity-40 flex items-center gap-1"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      {isTranslatingAI
+                        ? 'Traduzindo...'
+                        : 'Preencher tradução automática'}
+                    </button>
+                  </div>
+                  <textarea
+                    rows={3}
+                    value={newPortugueseRaw}
+                    onChange={(e) => setNewPortugueseRaw(e.target.value)}
+                    placeholder={
+                      'Olhe para as estrelas, veja como elas brilham para você\nE tudo o que você faz...'
+                    }
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs sm:text-sm text-slate-300"
+                  />
+                </div>
 
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-semibold text-slate-300">
-                    Tradução em Português (Opcional - 1 por linha)
-                  </label>
+                <div className="flex items-center justify-end gap-2 pt-2">
                   <button
                     type="button"
-                    onClick={handleAutoTranslateCustomText}
-                    disabled={!newEnglishRaw.trim() || isTranslatingAI}
-                    className="text-[11px] font-bold text-indigo-400 hover:text-indigo-300 disabled:opacity-40 flex items-center gap-1"
+                    onClick={() => setShowImportModal(false)}
+                    className="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold"
                   >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    {isTranslatingAI
-                      ? 'Traduzindo...'
-                      : 'Preencher dicas/tradução automática'}
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-emerald-600/25"
+                  >
+                    Salvar no App (+15 XP)
                   </button>
                 </div>
-                <textarea
-                  rows={3}
-                  value={newPortugueseRaw}
-                  onChange={(e) => setNewPortugueseRaw(e.target.value)}
-                  placeholder={'Olhe para as estrelas, veja como elas brilham para você\nE tudo o que você faz...'}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs sm:text-sm text-slate-300"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowImportModal(false)}
-                  className="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-emerald-600/25"
-                >
-                  Criar Lição Interativa (+15 XP)
-                </button>
-              </div>
-            </form>
+              </form>
+            )}
           </div>
         </div>
       )}
