@@ -365,7 +365,7 @@ export const INTERACTIVE_TEXTS = [
         pt: 'Verdadeiros avanços raramente surgem de riscar tarefas triviais da lista; pelo contrário, eles emergem quando reservamos blocos ininterruptos de tempo para enfrentar problemas complexos.',
       },
       {
-        en: 'Ultimately, mastering your schedule is less about squeezing more into every hour and more about having the discernment to ruthlessy eliminate what no longer serves your long-term vision.',
+        en: 'Ultimately, mastering your schedule is less about squeezing more into every hour and more about having the discernment to ruthlessly eliminate what no longer serves your long-term vision.',
         pt: 'Em última análise, dominar sua rotina tem menos a ver com espremer mais coisas em cada hora e mais com ter o discernimento para eliminar sem piedade o que não serve mais à sua visão de longo prazo.',
       },
     ],

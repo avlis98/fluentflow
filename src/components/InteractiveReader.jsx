@@ -234,10 +234,13 @@ export default function InteractiveReader({
       COMMON_DICTIONARY[cleanKey.replace(/s$/, '')] ||
       COMMON_DICTIONARY[cleanKey.replace(/ed$/, '')];
 
+    const displayWord = curated ? curated.word : cleanKey;
+    const readablePhonetic = generatePortuguesePhonetics(displayWord);
+
     const info = curated
       ? {
           word: curated.word,
-          phonetic: curated.phonetic,
+          phonetic: readablePhonetic,
           translation: curated.translation,
           partOfSpeech: curated.partOfSpeech,
           usageExplanation: `Bloco/expressão de nível ${activeText.level} usado em "${activeText.title}".`,
@@ -247,7 +250,7 @@ export default function InteractiveReader({
         }
       : {
           word: cleanKey,
-          phonetic: common?.phonetic || '/.../',
+          phonetic: readablePhonetic,
           translation:
             common?.translation ||
             paragraphTranslation ||
@@ -518,17 +521,14 @@ export default function InteractiveReader({
 
           {selectedWordInfo ? (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-xl font-extrabold text-white">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <h3 className="text-xl font-extrabold text-white break-words">
                     “{selectedWordInfo.word}”
                   </h3>
-                  <p className="text-xs font-bold text-amber-300 mt-0.5">
-                    🗣️ Como soa: “
+                  <p className="inline-block text-xs font-bold text-amber-300 bg-amber-500/10 border border-amber-500/30 px-2.5 py-0.5 rounded-lg mt-1">
+                    🗣️ Como pronunciar: “
                     {generatePortuguesePhonetics(selectedWordInfo.word)}”
-                  </p>
-                  <p className="text-[11px] font-mono text-indigo-300">
-                    {selectedWordInfo.phonetic}
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -1038,23 +1038,33 @@ export default function InteractiveReader({
         <div className="lg:hidden fixed bottom-16 inset-x-3 z-40 bg-slate-900/95 backdrop-blur-md border border-indigo-500/50 rounded-2xl p-4 shadow-2xl space-y-2.5">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <h3 className="text-lg font-extrabold text-white truncate">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-lg font-extrabold text-white">
                   “{selectedWordInfo.word}”
                 </h3>
-                <span className="text-xs font-mono text-indigo-300 shrink-0">
-                  {selectedWordInfo.phonetic}
+                <span className="text-xs font-bold text-amber-300 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-lg">
+                  🗣️ Como pronunciar: “
+                  {generatePortuguesePhonetics(selectedWordInfo.word)}”
                 </span>
               </div>
               <input
                 type="text"
                 value={customWordTranslation}
                 onChange={(e) => setCustomWordTranslation(e.target.value)}
-                className="w-full mt-1 px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-700 text-xs font-semibold text-emerald-300"
+                className="w-full mt-1.5 px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-700 text-xs font-semibold text-emerald-300"
               />
             </div>
 
             <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                onClick={() =>
+                  speakText(selectedWordInfo.word, { rate: 0.55, accent })
+                }
+                className="px-2 py-2 rounded-xl bg-emerald-600/25 border border-emerald-500/40 text-emerald-200 text-xs font-bold"
+                title="Ouvir bem devagar (0.55x)"
+              >
+                🐢 0.55x
+              </button>
               <button
                 onClick={() =>
                   speakText(selectedWordInfo.word, { rate: 0.9, accent })

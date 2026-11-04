@@ -581,9 +581,9 @@ export default function FlashcardsModule({
                           .map((w, idx) => (
                             <span
                               key={idx}
-                              className={`inline-block rounded px-1 transition ${
+                              className={`rounded px-1 transition-colors ${
                                 activeSpokenWordIdx === idx
-                                  ? 'bg-emerald-500 text-slate-950 scale-105'
+                                  ? 'bg-emerald-400 text-slate-950'
                                   : ''
                               }`}
                             >
@@ -594,11 +594,8 @@ export default function FlashcardsModule({
                       </h3>
                       <div className="inline-flex flex-col sm:flex-row items-center gap-2 bg-amber-500/10 border border-amber-500/30 px-3.5 py-1.5 rounded-xl">
                         <span className="text-xs sm:text-sm font-bold text-amber-300">
-                          🗣️ Como ler: “
+                          🗣️ Como pronunciar: “
                           {generatePortuguesePhonetics(currentCard.word)}”
-                        </span>
-                        <span className="text-xs font-mono text-slate-400">
-                          ({currentCard.phonetic})
                         </span>
                       </div>
                       <p className="text-xs text-slate-400 pt-3">
@@ -1334,6 +1331,9 @@ export default function FlashcardsModule({
                   </button>
                 </div>
                 <h4 className="text-base font-bold text-white">“{card.word}”</h4>
+                <p className="text-[11px] font-bold text-amber-300 mt-0.5">
+                  🗣️ Como pronunciar: “{generatePortuguesePhonetics(card.word)}”
+                </p>
                 <p className="text-xs text-emerald-300 font-medium mt-0.5">
                   {card.translation}
                 </p>
