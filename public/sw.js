@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fluentflow-pwa-v11';
+const CACHE_NAME = 'fluentflow-pwa-v12';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

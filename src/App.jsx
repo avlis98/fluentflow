@@ -233,7 +233,13 @@ export default function App() {
 
   const handleAddCustomText = (newTextObj) => {
     setCustomTexts((prev) => [newTextObj, ...prev]);
-    handleAwardXP(15, `Texto "${newTextObj.title}" criado na sua biblioteca! (+15 XP)`);
+    handleAwardXP(15, `Texto "${newTextObj.title}" salvo com tradução na sua biblioteca! (+15 XP)`);
+  };
+
+  const handleUpdateCustomText = (updatedTextObj) => {
+    setCustomTexts((prev) =>
+      prev.map((t) => (t.id === updatedTextObj.id ? updatedTextObj : t))
+    );
   };
 
   const handleDeleteCustomText = (textId) => {
@@ -443,6 +449,7 @@ export default function App() {
             onCompleteText={handleCompleteText}
             customTexts={customTexts}
             onAddCustomText={handleAddCustomText}
+            onUpdateCustomText={handleUpdateCustomText}
             onDeleteCustomText={handleDeleteCustomText}
             geminiApiKey={geminiApiKey}
           />

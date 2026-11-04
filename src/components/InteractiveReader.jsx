@@ -45,6 +45,7 @@ export default function InteractiveReader({
   onCompleteText,
   customTexts = [],
   onAddCustomText,
+  onUpdateCustomText,
   onDeleteCustomText,
   geminiApiKey = '',
 }) {
@@ -422,55 +423,52 @@ export default function InteractiveReader({
     setNewPortugueseRaw(approxLines.join('\n'));
   };
 
-  const handleCreateCustomTextSubmit = (e) => {
-    e.preventDefault();
-    const enLines = newEnglishRaw
-      .split(/\n+/)
-      .map((l) => l.trim())
-      .filter(Boolean);
-    if (!newTitle.trim() || enLines.length === 0) return;
-
-    const ptLines = newPortugueseRaw
-      .split(/\n+/)
-      .map((l) => l.trim())
-      .filter(Boolean);
-
-    const paragraphs = enLines.map((enLine, idx) => ({
-      en: enLine,
-      pt:
-        ptLines[idx] ||
-        'Toque em qualquer palavra desta linha para ouvir a pronúncia e salvar nos Flashcards.',
-    }));
-
-    const created = {
-      id: `custom-${Date.now()}`,
-      isCustom: true,
-      title: newTitle.trim(),
-      subtitle: 'Importado por você • Estudo Personalizado',
-      category: newCategory,
-      level: newLevel,
-      accent: preferredAccent || 'en-US',
-      duration: `${Math.max(1, Math.ceil(enLines.length / 3))} min`,
-      coverEmoji: newEmoji,
-      paragraphs,
-      vocabulary: {},
-      quiz: [],
-    };
-
-    if (onAddCustomText) {
-      onAddCustomText(created);
+  const isMissingTranslation = (ptStr, enStr) => {
+    const cleanPt = String(ptStr || '')
+      .replace(/🎵/g, '')
+      .trim();
+    const cleanEn = String(enStr || '')
+      .replace(/🎵/g, '')
+      .trim();
+    if (!cleanPt) return true;
+    if (cleanPt.toLowerCase() === cleanEn.toLowerCase()) return true;
+    if (
+      cleanPt.includes('Toque em qualquer palavra') ||
+      cleanPt.includes('Toque nas palavras em inglês')
+    ) {
+      return true;
     }
-    setActiveTextId(created.id);
-    setShowImportModal(false);
-    setNewTitle('');
-    setNewEnglishRaw('');
-    setNewPortugueseRaw('');
+    return false;
+  };
+
+  const translateLineOfflineFallback = (line) => {
+    const clean = String(line || '')
+      .replace(/🎵/g, '')
+      .trim();
+    const words = clean.split(/\s+/).filter(Boolean);
+    const mapped = words.map((w) => {
+      const key = w
+        .toLowerCase()
+        .replace(/’/g, "'")
+        .replace(/[^a-z'-]/g, '');
+      const dict =
+        COMMON_DICTIONARY[key] ||
+        COMMON_DICTIONARY[key.replace(/s$/, '')] ||
+        COMMON_DICTIONARY[key.replace(/ed$/, '')];
+      if (dict?.translation) {
+        return dict.translation.split('/')[0].split('(')[0].trim();
+      }
+      return w;
+    });
+    return mapped.join(' ');
   };
 
   const translateLineToPt = async (line) => {
+    const clean = String(line || '')
+      .replace(/🎵/g, '')
+      .trim();
+    if (!clean) return '';
     try {
-      const clean = line.replace(/🎵/g, '').trim();
-      if (!clean) return '';
       const res = await fetch(
         `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=pt&dt=t&q=${encodeURIComponent(
           clean
@@ -480,9 +478,140 @@ export default function InteractiveReader({
       const joined = Array.isArray(data?.[0])
         ? data[0].map((part) => part?.[0] || '').join('')
         : '';
-      return joined.trim() || clean;
+      const trimmed = joined.trim();
+      if (trimmed && trimmed.toLowerCase() !== clean.toLowerCase()) {
+        return trimmed;
+      }
     } catch {
-      return 'Toque em qualquer palavra desta linha para ouvir a pronúncia e ver a tradução.';
+      // Fallback para dicionário local se estiver sem internet
+    }
+    return translateLineOfflineFallback(clean);
+  };
+
+  const translateBatchToPt = async (linesArray) => {
+    const cleanedLines = linesArray.map((l) =>
+      String(l || '')
+        .replace(/🎵/g, '')
+        .trim()
+    );
+    if (cleanedLines.length === 0) return [];
+
+    // Tenta traduzir o bloco inteiro de uma só vez para máxima fluidez e rapidez
+    try {
+      const joinedQuery = cleanedLines.join('\n');
+      const res = await fetch(
+        `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=pt&dt=t&q=${encodeURIComponent(
+          joinedQuery
+        )}`
+      );
+      const data = await res.json();
+      const fullTranslated = Array.isArray(data?.[0])
+        ? data[0].map((part) => part?.[0] || '').join('')
+        : '';
+      const splitLines = fullTranslated
+        .split(/\r?\n/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      if (splitLines.length === cleanedLines.length) {
+        return splitLines;
+      }
+    } catch {
+      // Continua para tradução linha a linha
+    }
+
+    return Promise.all(cleanedLines.map((line) => translateLineToPt(line)));
+  };
+
+  // Se algum texto/música salvo anteriormente estiver sem tradução em português, traduz automaticamente ao abrir
+  useEffect(() => {
+    let cancelled = false;
+    if (!activeText?.paragraphs?.length) return;
+
+    const needsTranslation = activeText.paragraphs.some((p) =>
+      isMissingTranslation(p.pt, p.en)
+    );
+    if (!needsTranslation) return;
+
+    (async () => {
+      const updatedParagraphs = await Promise.all(
+        activeText.paragraphs.map(async (p) => {
+          if (!isMissingTranslation(p.pt, p.en)) return p;
+          const hasNote = p.en.includes('🎵');
+          const tr = await translateLineToPt(p.en);
+          return {
+            ...p,
+            pt: hasNote ? `🎵 ${tr}` : tr,
+          };
+        })
+      );
+      if (!cancelled && onUpdateCustomText && activeText.isCustom) {
+        onUpdateCustomText({
+          ...activeText,
+          paragraphs: updatedParagraphs,
+        });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTextId, activeText?.id]);
+
+  const handleCreateCustomTextSubmit = async (e) => {
+    e.preventDefault();
+    const enLines = newEnglishRaw
+      .split(/\n+/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+    if (!newTitle.trim() || enLines.length === 0) return;
+
+    setIsTranslatingAI(true);
+    try {
+      const userPtLines = newPortugueseRaw
+        .split(/\n+/)
+        .map((l) => l.trim())
+        .filter(Boolean);
+
+      // Se o aluno não preencheu todas as linhas em português, traduz automaticamente antes de salvar
+      const autoPtLines =
+        userPtLines.length === enLines.length
+          ? userPtLines
+          : await translateBatchToPt(enLines);
+
+      const paragraphs = enLines.map((enLine, idx) => ({
+        en: enLine,
+        pt:
+          userPtLines[idx] ||
+          autoPtLines[idx] ||
+          translateLineOfflineFallback(enLine),
+      }));
+
+      const created = {
+        id: `custom-${Date.now()}`,
+        isCustom: true,
+        title: newTitle.trim(),
+        subtitle: 'Salvo com Tradução em Português • Estudo Personalizado',
+        category: newCategory,
+        level: newLevel,
+        accent: preferredAccent || 'en-US',
+        duration: `${Math.max(1, Math.ceil(enLines.length / 3))} min`,
+        coverEmoji: newEmoji,
+        paragraphs,
+        vocabulary: {},
+        quiz: [],
+      };
+
+      if (onAddCustomText) {
+        onAddCustomText(created);
+      }
+      setActiveTextId(created.id);
+      setShowImportModal(false);
+      setNewTitle('');
+      setNewEnglishRaw('');
+      setNewPortugueseRaw('');
+    } finally {
+      setIsTranslatingAI(false);
     }
   };
 
@@ -575,7 +704,11 @@ export default function InteractiveReader({
     setIsSearchingWeb(false);
   };
 
-  const handleImportSongFromWeb = async (song, editFirst = false) => {
+  const handleImportSongFromWeb = async (
+    song,
+    editFirst = false,
+    downloadAfter = false
+  ) => {
     setImportingItemId(song.id);
     try {
       const rawLines = String(song.plainLyrics || '')
@@ -585,14 +718,12 @@ export default function InteractiveReader({
 
       // Agrupa de 2 em 2 versos para criar estrofes confortáveis de ouvir e repetir
       const stanzas = [];
-      for (let i = 0; i < rawLines.length && stanzas.length < 14; i += 2) {
+      for (let i = 0; i < rawLines.length && stanzas.length < 16; i += 2) {
         const pair = rawLines.slice(i, i + 2).join(' / ');
         stanzas.push(`🎵 ${pair}`);
       }
 
-      const translatedStanzas = await Promise.all(
-        stanzas.map((stanza) => translateLineToPt(stanza))
-      );
+      const translatedStanzas = await translateBatchToPt(stanzas);
 
       const fullTitle = `${song.trackName} — ${song.artistName}`;
 
@@ -610,14 +741,16 @@ export default function InteractiveReader({
 
       const paragraphs = stanzas.map((enLine, idx) => ({
         en: enLine,
-        pt: `🎵 ${translatedStanzas[idx] || ''}`,
+        pt: `🎵 ${
+          translatedStanzas[idx] || translateLineOfflineFallback(enLine)
+        }`,
       }));
 
       const created = {
         id: `custom-song-${Date.now()}`,
         isCustom: true,
         title: fullTitle,
-        subtitle: `Letra importada da internet • Salva no seu celular`,
+        subtitle: `Letra + Tradução em Português • Salva no seu celular`,
         category: 'Música & Pronúncia',
         level: 'B1-B2',
         accent: preferredAccent || 'en-US',
@@ -632,13 +765,16 @@ export default function InteractiveReader({
         onAddCustomText(created);
       }
       setActiveTextId(created.id);
+      if (downloadAfter) {
+        await handleDownloadTextToPhone(created);
+      }
       setShowImportModal(false);
     } finally {
       setImportingItemId(null);
     }
   };
 
-  const handleImportArticleFromWeb = async (article) => {
+  const handleImportArticleFromWeb = async (article, downloadAfter = false) => {
     setImportingItemId(article.pageid);
     try {
       const host =
@@ -663,20 +799,31 @@ export default function InteractiveReader({
             rawParagraphs[0],
           ];
         finalEnParagraphs = [];
-        for (let i = 0; i < sentences.length && finalEnParagraphs.length < 5; i += 2) {
+        for (
+          let i = 0;
+          i < sentences.length && finalEnParagraphs.length < 5;
+          i += 2
+        ) {
           finalEnParagraphs.push(sentences.slice(i, i + 2).join(' '));
         }
       }
 
-      const translatedParagraphs = await Promise.all(
-        finalEnParagraphs.map((p) => translateLineToPt(p))
-      );
+      const [translatedTitle, translatedParagraphs] = await Promise.all([
+        translateLineToPt(article.title),
+        translateBatchToPt(finalEnParagraphs),
+      ]);
+
+      const bilingualTitle =
+        translatedTitle &&
+        translatedTitle.toLowerCase() !== article.title.toLowerCase()
+          ? `${article.title} (${translatedTitle})`
+          : article.title;
 
       const created = {
         id: `custom-wiki-${Date.now()}`,
         isCustom: true,
-        title: article.title,
-        subtitle: 'Artigo importado da internet • Salvo no seu celular',
+        title: bilingualTitle,
+        subtitle: 'Texto + Tradução em Português • Salvo no seu celular',
         category: 'Leitura da Web',
         level: article.wikiLang === 'simple' ? 'A1-A2' : 'B1-B2',
         accent: preferredAccent || 'en-US',
@@ -684,7 +831,7 @@ export default function InteractiveReader({
         coverEmoji: '📰',
         paragraphs: finalEnParagraphs.map((en, idx) => ({
           en,
-          pt: translatedParagraphs[idx] || '',
+          pt: translatedParagraphs[idx] || translateLineOfflineFallback(en),
         })),
         vocabulary: {},
         quiz: [],
@@ -694,30 +841,76 @@ export default function InteractiveReader({
         onAddCustomText(created);
       }
       setActiveTextId(created.id);
+      if (downloadAfter) {
+        await handleDownloadTextToPhone(created);
+      }
       setShowImportModal(false);
     } finally {
       setImportingItemId(null);
     }
   };
 
-  const handleDownloadTextToPhone = (textToSave = activeText) => {
+  const handleDownloadTextToPhone = async (textToSave = activeText) => {
     if (!textToSave) return;
+
+    // Garante que todos os parágrafos/estrofes tenham tradução completa em português antes de gerar o arquivo
+    const resolvedParagraphs = await Promise.all(
+      textToSave.paragraphs.map(async (p) => {
+        if (!isMissingTranslation(p.pt, p.en)) return p;
+        const tr = await translateLineToPt(p.en);
+        return {
+          ...p,
+          pt: p.en.includes('🎵') ? `🎵 ${tr}` : tr,
+        };
+      })
+    );
+
+    if (
+      textToSave.isCustom &&
+      onUpdateCustomText &&
+      resolvedParagraphs.some((p, i) => p.pt !== textToSave.paragraphs[i]?.pt)
+    ) {
+      onUpdateCustomText({
+        ...textToSave,
+        paragraphs: resolvedParagraphs,
+      });
+    }
+
     const lines = [
-      '====================================================',
-      `FLUENTFLOW — APOSTILA DE ESTUDO NO CELULAR`,
+      '==============================================================',
+      'FLUENTFLOW — MATERIAL DE ESTUDO BILÍNGUE (INGLÊS + PORTUGUÊS)',
       `Título: ${textToSave.title}`,
       `Categoria: ${textToSave.category} | Nível: ${textToSave.level}`,
-      '====================================================',
+      '==============================================================',
+      '',
+      '--------------------------------------------------------------',
+      'PARTE 1: ESTUDO PASSO A PASSO (INGLÊS + PRONÚNCIA + TRADUÇÃO)',
+      '--------------------------------------------------------------',
       '',
     ];
 
-    textToSave.paragraphs.forEach((p, idx) => {
+    resolvedParagraphs.forEach((p, idx) => {
       lines.push(`[Trecho ${idx + 1}]`);
-      lines.push(`🇺🇸 Inglês: ${p.en}`);
+      lines.push(`🇺🇸 Inglês:    ${p.en}`);
       lines.push(`🗣️ Pronúncia: ${generatePortuguesePhonetics(p.en)}`);
-      lines.push(`🇧🇷 Tradução: ${p.pt}`);
+      lines.push(`🇧🇷 Tradução:  ${p.pt}`);
       lines.push('');
     });
+
+    lines.push('--------------------------------------------------------------');
+    lines.push('PARTE 2: TEXTO / LETRA COMPLETA EM INGLÊS');
+    lines.push('--------------------------------------------------------------');
+    resolvedParagraphs.forEach((p) => {
+      lines.push(p.en);
+    });
+    lines.push('');
+    lines.push('--------------------------------------------------------------');
+    lines.push('PARTE 3: TRADUÇÃO COMPLETA EM PORTUGUÊS');
+    lines.push('--------------------------------------------------------------');
+    resolvedParagraphs.forEach((p) => {
+      lines.push(p.pt);
+    });
+    lines.push('');
 
     const content = lines.join('\n');
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
@@ -728,7 +921,7 @@ export default function InteractiveReader({
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '');
     link.href = url;
-    link.download = `fluentflow-${safeName || 'estudo'}.txt`;
+    link.download = `fluentflow-${safeName || 'estudo'}-bilingue.txt`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1165,12 +1358,16 @@ export default function InteractiveReader({
                     </p>
 
                     {showTranslations && (
-                      <div className="space-y-1 border-l-2 border-slate-700 pl-3 min-w-0">
-                        <p className="text-xs font-medium text-amber-300/90 break-words">
-                          🗣️ Como soa: “{generatePortuguesePhonetics(para.en)}”
+                      <div className="space-y-1.5 border-l-2 border-indigo-500/50 pl-3 min-w-0">
+                        <p className="text-xs font-medium text-amber-300/95 break-words">
+                          🗣️ <strong>Como soa:</strong> “
+                          {generatePortuguesePhonetics(para.en)}”
                         </p>
-                        <p className="text-sm text-slate-400 break-words">
-                          {para.pt}
+                        <p className="text-xs sm:text-sm font-medium text-emerald-200/95 bg-emerald-950/25 border border-emerald-500/20 px-2.5 py-1.5 rounded-xl break-words">
+                          🇧🇷 <strong>Tradução:</strong>{' '}
+                          {isMissingTranslation(para.pt, para.en)
+                            ? translateLineOfflineFallback(para.en)
+                            : para.pt}
                         </p>
                       </div>
                     )}
@@ -1622,12 +1819,12 @@ export default function InteractiveReader({
                                   “{preview}...”
                                 </p>
                               </div>
-                              <div className="flex items-center gap-1.5 shrink-0">
+                              <div className="flex flex-wrap items-center gap-1.5 shrink-0">
                                 <button
                                   type="button"
                                   disabled={Boolean(importingItemId)}
                                   onClick={() =>
-                                    handleImportSongFromWeb(song, true)
+                                    handleImportSongFromWeb(song, true, false)
                                   }
                                   className="px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
                                 >
@@ -1637,7 +1834,19 @@ export default function InteractiveReader({
                                   type="button"
                                   disabled={Boolean(importingItemId)}
                                   onClick={() =>
-                                    handleImportSongFromWeb(song, false)
+                                    handleImportSongFromWeb(song, false, true)
+                                  }
+                                  className="px-2.5 py-2 rounded-xl bg-indigo-600/25 hover:bg-indigo-600/40 border border-indigo-500/40 text-indigo-200 text-xs font-bold flex items-center gap-1"
+                                  title="Baixar arquivo .txt no celular com letra + pronúncia + tradução em português"
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                  <span>Baixar c/ PT</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={Boolean(importingItemId)}
+                                  onClick={() =>
+                                    handleImportSongFromWeb(song, false, false)
                                   }
                                   className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 shadow"
                                 >
@@ -1677,24 +1886,40 @@ export default function InteractiveReader({
                                   {cleanSnippet}...
                                 </p>
                               </div>
-                              <button
-                                type="button"
-                                disabled={Boolean(importingItemId)}
-                                onClick={() => handleImportArticleFromWeb(art)}
-                                className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold flex items-center justify-center gap-1.5 shrink-0 shadow"
-                              >
-                                {isImportingThis ? (
-                                  <>
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                    <span>Traduzindo...</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Plus className="w-3.5 h-3.5" />
-                                    <span>Levar p/ o App</span>
-                                  </>
-                                )}
-                              </button>
+                              <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                                <button
+                                  type="button"
+                                  disabled={Boolean(importingItemId)}
+                                  onClick={() =>
+                                    handleImportArticleFromWeb(art, true)
+                                  }
+                                  className="px-2.5 py-2 rounded-xl bg-indigo-600/25 hover:bg-indigo-600/40 border border-indigo-500/40 text-indigo-200 text-xs font-bold flex items-center gap-1"
+                                  title="Baixar arquivo .txt no celular com texto + pronúncia + tradução em português"
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                  <span>Baixar c/ PT</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={Boolean(importingItemId)}
+                                  onClick={() =>
+                                    handleImportArticleFromWeb(art, false)
+                                  }
+                                  className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold flex items-center justify-center gap-1.5 shrink-0 shadow"
+                                >
+                                  {isImportingThis ? (
+                                    <>
+                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                      <span>Traduzindo...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Plus className="w-3.5 h-3.5" />
+                                      <span>Levar p/ o App</span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
                             </div>
                           );
                         })}
@@ -1774,7 +1999,7 @@ export default function InteractiveReader({
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="block text-xs font-semibold text-slate-300">
-                      Tradução em Português (Opcional - 1 por linha)
+                      Tradução em Português (Se deixar em branco, traduz sozinho ao salvar!)
                     </label>
                     <button
                       type="button"
@@ -1785,7 +2010,7 @@ export default function InteractiveReader({
                       <Sparkles className="w-3.5 h-3.5" />
                       {isTranslatingAI
                         ? 'Traduzindo...'
-                        : 'Preencher tradução automática'}
+                        : 'Ver tradução agora'}
                     </button>
                   </div>
                   <textarea
@@ -1809,9 +2034,17 @@ export default function InteractiveReader({
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-emerald-600/25"
+                    disabled={isTranslatingAI}
+                    className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs sm:text-sm font-bold shadow-lg shadow-emerald-600/25 flex items-center gap-1.5"
                   >
-                    Salvar no App (+15 XP)
+                    {isTranslatingAI ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Traduzindo e salvando...</span>
+                      </>
+                    ) : (
+                      <span>Salvar com Tradução (+15 XP)</span>
+                    )}
                   </button>
                 </div>
               </form>
