@@ -1353,3 +1353,318 @@ export function generatePortuguesePhonetics(sentence) {
     .map((w) => approximateWordToPt(w))
     .join(' ');
 }
+
+/**
+ * Fala uma frase em Português do Brasil (usado no Modo Aula Mãos-Livres no Fone)
+ */
+export function speakPortuguese(text, { rate = 1.02, onStart, onEnd } = {}) {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+    if (onEnd) onEnd();
+    return;
+  }
+  stopSpeaking();
+  const clean = String(text || '')
+    .replace(/🎵/g, '')
+    .trim();
+  if (!clean) {
+    if (onEnd) onEnd();
+    return;
+  }
+
+  const utterance = new SpeechSynthesisUtterance(clean);
+  utterance.lang = 'pt-BR';
+  utterance.rate = rate;
+
+  const voices = window.speechSynthesis.getVoices();
+  const ptVoice =
+    voices.find((v) => v.lang.includes('pt-BR') && v.name.includes('Google')) ||
+    voices.find((v) => v.lang.includes('pt-BR')) ||
+    voices.find((v) => v.lang.startsWith('pt'));
+
+  if (ptVoice) {
+    utterance.voice = ptVoice;
+  }
+  if (onStart) utterance.onstart = onStart;
+  if (onEnd) {
+    utterance.onend = onEnd;
+    utterance.onerror = onEnd;
+  }
+  window.speechSynthesis.speak(utterance);
+}
+
+// Regras de Fala Conectada Nativa (Connected Speech / Reduções e Ligações de Som)
+const CONNECTED_SPEECH_PATTERNS = [
+  {
+    regex: /\bgoing to\b/i,
+    original: 'going to',
+    nativeSound: 'gó-na (gonna)',
+    tip: 'Nativos quase nunca falam "gôu-in tchu" separado em conversas rápidas.',
+  },
+  {
+    regex: /\bwant to\b/i,
+    original: 'want to',
+    nativeSound: 'uô-na (wanna)',
+    tip: 'O "t" desaparece e as duas palavras viram um bloco só.',
+  },
+  {
+    regex: /\bhave to\b/i,
+    original: 'have to',
+    nativeSound: 'réf-ta (hafta)',
+    tip: 'O som de "v" suaviza para "f" antes do "to".',
+  },
+  {
+    regex: /\bgot to\b/i,
+    original: 'got to',
+    nativeSound: 'gó-ra (gotta)',
+    tip: 'Os dois "t" entre vogais soam como o nosso "R" fraco de "arara".',
+  },
+  {
+    regex: /\bkind of\b/i,
+    original: 'kind of',
+    nativeSound: 'kái-nda (kinda)',
+    tip: 'Muito usado para dizer "meio que / tipo".',
+  },
+  {
+    regex: /\bout of\b/i,
+    original: 'out of',
+    nativeSound: 'áu-ra (outta)',
+    tip: 'O "t" de "out" emenda com "of" virando "áu-ra".',
+  },
+  {
+    regex: /\ba lot of\b/i,
+    original: 'a lot of',
+    nativeSound: 'â-ló-ra',
+    tip: 'Três palavras que na fala real soam como uma única palavra fluida.',
+  },
+  {
+    regex: /\bwhat do you\b/i,
+    original: 'what do you',
+    nativeSound: 'uó-râ-iú (whaddaya)',
+    tip: 'Clássica junção americana em perguntas rápidas.',
+  },
+  {
+    regex: /\bwhat are you\b/i,
+    original: 'what are you',
+    nativeSound: 'uó-tcha (whatcha)',
+    tip: 'O "t" + "y" cria som de "tch".',
+  },
+  {
+    regex: /\bdid you\b/i,
+    original: 'did you',
+    nativeSound: 'dê-dju (didja)',
+    tip: 'O "d" final de "did" junta com "you" formando som de "dj".',
+  },
+  {
+    regex: /\bwould you\b/i,
+    original: 'would you',
+    nativeSound: 'uú-dju (wouldja)',
+    tip: 'Em pedidos educados, "would you" soa grudado como "uú-dju".',
+  },
+  {
+    regex: /\bcould you\b/i,
+    original: 'could you',
+    nativeSound: 'kú-dju (couldja)',
+    tip: 'O "d" emenda direto no "you".',
+  },
+  {
+    regex: /\bdon't you\b/i,
+    original: "don't you",
+    nativeSound: 'dôn-tcha',
+    tip: 'O "t" + "y" produz som natural de "tch".',
+  },
+  {
+    regex: /\blet me\b/i,
+    original: 'let me',
+    nativeSound: 'lé-mi (lemme)',
+    tip: 'O "t" é engolido antes do "m".',
+  },
+  {
+    regex: /\bgive me\b/i,
+    original: 'give me',
+    nativeSound: 'gê-mi (gimme)',
+    tip: 'Contração natural muito comum em músicas e filmes.',
+  },
+  {
+    regex: /\blook at\b/i,
+    original: 'look at',
+    nativeSound: 'lú-két',
+    tip: 'O "k" final de "look" gruda na vogal de "at".',
+  },
+  {
+    regex: /\bcheck it out\b/i,
+    original: 'check it out',
+    nativeSound: 'tché-ki-ráut',
+    tip: 'Consoantes finais grudam nas vogais seguintes sem pausa.',
+  },
+  {
+    regex: /\bpick it up\b/i,
+    original: 'pick it up',
+    nativeSound: 'pê-ki-râp',
+    tip: 'Três palavras conectadas em um único fôlego.',
+  },
+  {
+    regex: /\bfigure it out\b/i,
+    original: 'figure it out',
+    nativeSound: 'fê-gui-ráut',
+    tip: 'O "t" de "it" vira "r" suave antes de "out".',
+  },
+  {
+    regex: /\btalk about\b/i,
+    original: 'talk about',
+    nativeSound: 'tó-kâ-báut',
+    tip: 'O "k" emenda direto no "a" de "about".',
+  },
+  {
+    regex: /\bthink about\b/i,
+    original: 'think about',
+    nativeSound: 'fên-kâ-báut',
+    tip: 'Junção direta de consoante + vogal.',
+  },
+  {
+    regex: /\bwake up\b/i,
+    original: 'wake up',
+    nativeSound: 'uêi-kâp',
+    tip: 'Soa como uma única palavra.',
+  },
+  {
+    regex: /\bget up\b/i,
+    original: 'get up',
+    nativeSound: 'gué-râp',
+    tip: 'O "t" entre vogais soa como "r" brando ("gué-râp").',
+  },
+  {
+    regex: /\bget out\b/i,
+    original: 'get out',
+    nativeSound: 'gué-ráut',
+    tip: 'O "t" de "get" vira "r" suave ao ligar com "out".',
+  },
+  {
+    regex: /\bright now\b/i,
+    original: 'right now',
+    nativeSound: 'rái-náu',
+    tip: 'O "t" de "right" é travado na garganta antes do "n".',
+  },
+  {
+    regex: /\bfor you\b/i,
+    original: 'for you',
+    nativeSound: 'fôr-iú',
+    tip: 'O "r" final de "for" liga suavemente com "you".',
+  },
+  {
+    regex: /\bwith you\b/i,
+    original: 'with you',
+    nativeSound: 'uê-tchú',
+    tip: 'Na fala rápida, "with you" se funde em "uê-tchú".',
+  },
+  {
+    regex: /\bin the\b/i,
+    original: 'in the',
+    nativeSound: 'ên-dâ',
+    tip: 'Preposição e artigo falados num único pulso.',
+  },
+  {
+    regex: /\bon the\b/i,
+    original: 'on the',
+    nativeSound: 'ón-dâ',
+    tip: 'Ligação rápida de "on" + "the".',
+  },
+  {
+    regex: /\bat the\b/i,
+    original: 'at the',
+    nativeSound: 'ét-dâ',
+    tip: 'O "t" quase não explode antes do "th".',
+  },
+  {
+    regex: /\bof the\b/i,
+    original: 'of the',
+    nativeSound: 'âv-dâ',
+    tip: 'Na fala rápida soa quase como "â-dâ".',
+  },
+  {
+    regex: /\bto the\b/i,
+    original: 'to the',
+    nativeSound: 'tchu-dâ',
+    tip: 'Redução natural antes de substantivos.',
+  },
+  {
+    regex: /\bhave a\b/i,
+    original: 'have a',
+    nativeSound: 'ré-va',
+    tip: 'O "v" de "have" gruda no "a" formando "ré-va".',
+  },
+  {
+    regex: /\bis a\b/i,
+    original: 'is a',
+    nativeSound: 'ê-za',
+    tip: 'O som de "z" em "is" liga direto com "a".',
+  },
+  {
+    regex: /\bit's a\b/i,
+    original: "it's a",
+    nativeSound: 'ê-tsa',
+    tip: 'Falado como um único bloco curto.',
+  },
+  {
+    regex: /\bi'd like a\b/i,
+    original: "I'd like a",
+    nativeSound: 'áid-lái-ka',
+    tip: 'O "k" de "like" emenda direto no "a".',
+  },
+  {
+    regex: /\bcan i\b/i,
+    original: 'can I',
+    nativeSound: 'ké-nái',
+    tip: 'O "n" de "can" junta com "I" virando "ké-nái".',
+  },
+  {
+    regex: /\bcould i\b/i,
+    original: 'could I',
+    nativeSound: 'kú-dái',
+    tip: 'O "d" de "could" liga direto na vogal "I".',
+  },
+];
+
+/**
+ * Detecta onde os nativos emendam os sons (Connected Speech) dentro de uma frase
+ */
+export function detectConnectedSpeech(sentence) {
+  if (!sentence) return [];
+  const clean = String(sentence).replace(/🎵/g, '').trim();
+  const found = [];
+
+  for (const item of CONNECTED_SPEECH_PATTERNS) {
+    const match = clean.match(item.regex);
+    if (match) {
+      found.push({
+        original: match[0],
+        nativeSound: item.nativeSound,
+        tip: item.tip,
+      });
+    }
+    if (found.length >= 3) break;
+  }
+
+  // Se ainda houver espaço, detecta junção automática Consoante Final + Vogal Inicial (ex: "make it", "come in", "all of")
+  if (found.length < 3) {
+    const cvRegex =
+      /\b([a-zA-Z]{2,}[tdkpnmlv])\s+(it|in|on|at|up|out|of|a|an|is|are|and)\b/gi;
+    let m;
+    while ((m = cvRegex.exec(clean)) !== null && found.length < 3) {
+      const pair = `${m[1]} ${m[2]}`;
+      const already = found.some(
+        (f) => f.original.toLowerCase() === pair.toLowerCase()
+      );
+      if (!already) {
+        const p1 = approximateSingleWordToPt(m[1]);
+        const p2 = approximateSingleWordToPt(m[2]);
+        found.push({
+          original: pair,
+          nativeSound: `${p1}-${p2}`.toLowerCase(),
+          tip: 'A consoante final da 1ª palavra gruda na vogal inicial da 2ª sem pausa.',
+        });
+      }
+    }
+  }
+
+  return found;
+}

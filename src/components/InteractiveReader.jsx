@@ -23,15 +23,21 @@ import {
   Loader2,
   Music,
   Newspaper,
+  Headphones,
+  Puzzle,
+  Zap,
+  RotateCcw,
 } from 'lucide-react';
 import { INTERACTIVE_TEXTS, COMMON_DICTIONARY } from '../data/content';
 import {
   speakText,
   speakWordByWord,
+  speakPortuguese,
   stopSpeaking,
   createSpeechRecognition,
   evaluatePronunciation,
   generatePortuguesePhonetics,
+  detectConnectedSpeech,
 } from '../utils/speech';
 
 export default function InteractiveReader({
@@ -95,8 +101,66 @@ export default function InteractiveReader({
   const [shadowResultsByPara, setShadowResultsByPara] = useState({});
   const recognitionRef = useRef(null);
 
-  useEffect(() => {
+  // Superpoderes de Aprendizado Rápido (Organizados sob Demanda)
+  const [isLessonMode, setIsLessonMode] = useState(false);
+  const [lessonStepLabel, setLessonStepLabel] = useState('');
+  const lessonTimerRef = useRef(null);
+  const lessonActiveRef = useRef(false);
+
+  const [showConnectedSpeech, setShowConnectedSpeech] = useState(true);
+  const [showSentenceBuilder, setShowSentenceBuilder] = useState(false);
+  const [puzzleParaIdx, setPuzzleParaIdx] = useState(0);
+  const [puzzleTargetWords, setPuzzleTargetWords] = useState([]);
+  const [puzzlePoolWords, setPuzzlePoolWords] = useState([]);
+  const [puzzleSelectedWords, setPuzzleSelectedWords] = useState([]);
+  const [puzzleErrorFlash, setPuzzleErrorFlash] = useState(false);
+  const [puzzleCompleted, setPuzzleCompleted] = useState(false);
+  const [isExtractingWords, setIsExtractingWords] = useState(false);
+
+  const stopLessonMode = () => {
+    lessonActiveRef.current = false;
+    if (lessonTimerRef.current) clearTimeout(lessonTimerRef.current);
     stopSpeaking();
+    setIsLessonMode(false);
+    setLessonStepLabel('');
+    setPlayingParagraphIdx(null);
+    setActiveParaWordIdx(-1);
+  };
+
+  const initSentencePuzzle = (pIdx = 0, textObj = activeText) => {
+    const safeIdx =
+      pIdx >= (textObj?.paragraphs?.length || 1) ? 0 : Math.max(0, pIdx);
+    const rawEn = String(textObj?.paragraphs?.[safeIdx]?.en || '')
+      .replace(/🎵/g, '')
+      .replace(/\s+\/\s+/g, ' ')
+      .trim();
+    // Pega a primeira frase (até 12 palavras) para montar confortavelmente com toques
+    const firstSentence =
+      rawEn
+        .split(/(?<=[.!?])\s+/)[0]
+        ?.split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 12) || [];
+
+    const indexed = firstSentence.map((word, idx) => ({
+      id: `pw-${safeIdx}-${idx}`,
+      word,
+    }));
+    const shuffled = [...indexed].sort(
+      (a, b) =>
+        a.word.localeCompare(b.word) || (a.id > b.id ? 1 : -1)
+    );
+
+    setPuzzleParaIdx(safeIdx);
+    setPuzzleTargetWords(indexed);
+    setPuzzlePoolWords(shuffled);
+    setPuzzleSelectedWords([]);
+    setPuzzleErrorFlash(false);
+    setPuzzleCompleted(false);
+  };
+
+  useEffect(() => {
+    stopLessonMode();
     recognitionRef.current?.stop();
     setPlayingParagraphIdx(null);
     setSelectedWordInfo(null);
@@ -106,7 +170,235 @@ export default function InteractiveReader({
     setIsRecordingShadow(false);
     setShadowResultsByPara({});
     setAccent(activeText.accent || preferredAccent || 'en-US');
+    initSentencePuzzle(0, activeText);
   }, [activeTextId]);
+
+  // 🎧 Modo Aula Mãos-Livres (Podcast Bilíngue: 1. Português -> 2. Inglês Lento -> 3. Inglês Natural -> 4. Pausa p/ Repetir)
+  const handleToggleLessonMode = () => {
+    if (isLessonMode) {
+      stopLessonMode();
+      return;
+    }
+
+    lessonActiveRef.current = true;
+    setIsLessonMode(true);
+
+    const runLessonParagraph = (idx) => {
+      if (!lessonActiveRef.current || idx >= activeText.paragraphs.length) {
+        stopLessonMode();
+        return;
+      }
+
+      const para = activeText.paragraphs[idx];
+      const cleanEn = para.en.replace(/🎵/g, '').trim();
+      const cleanPt = para.pt.replace(/🎵/g, '').trim();
+
+      setPlayingParagraphIdx(idx);
+      setActiveParaWordIdx(-1);
+      setLessonStepLabel(
+        `Trecho ${idx + 1}/${activeText.paragraphs.length} • 🇧🇷 1/3 Ouvindo significado em Português...`
+      );
+
+      speakPortuguese(cleanPt, {
+        rate: 1.05,
+        onEnd: () => {
+          if (!lessonActiveRef.current) return;
+          setLessonStepLabel(
+            `Trecho ${idx + 1}/${activeText.paragraphs.length} • 🐢 2/3 Ouvindo em Inglês Lento (0.65x)...`
+          );
+          speakText(cleanEn, {
+            rate: 0.65,
+            accent,
+            onWordBoundary: (wIdx) => setActiveParaWordIdx(wIdx),
+            onEnd: () => {
+              if (!lessonActiveRef.current) return;
+              setLessonStepLabel(
+                `Trecho ${idx + 1}/${activeText.paragraphs.length} • 🇺🇸 3/3 Ritmo Natural + Sua vez de repetir!`
+              );
+              speakText(cleanEn, {
+                rate: 0.95,
+                accent,
+                onWordBoundary: (wIdx) => setActiveParaWordIdx(wIdx),
+                onEnd: () => {
+                  if (!lessonActiveRef.current) return;
+                  setActiveParaWordIdx(-1);
+                  setLessonStepLabel(
+                    `🗣️ Repita em voz alta agora... (próximo trecho em 2s)`
+                  );
+                  lessonTimerRef.current = setTimeout(() => {
+                    runLessonParagraph(idx + 1);
+                  }, 2300);
+                },
+              });
+            },
+          });
+        },
+      });
+    };
+
+    runLessonParagraph(0);
+  };
+
+  // 🧩 Desafio Monte a Frase com 1 Toque
+  const handleTapPuzzleWord = (wordObj) => {
+    if (puzzleCompleted) return;
+    const nextExpectedIdx = puzzleSelectedWords.length;
+    const expectedWordObj = puzzleTargetWords[nextExpectedIdx];
+    if (!expectedWordObj) return;
+
+    speakText(wordObj.word, { rate: 0.9, accent });
+
+    if (
+      wordObj.word.toLowerCase().replace(/[^a-z']/g, '') ===
+      expectedWordObj.word.toLowerCase().replace(/[^a-z']/g, '')
+    ) {
+      const nextSelected = [...puzzleSelectedWords, wordObj];
+      setPuzzleSelectedWords(nextSelected);
+      setPuzzlePoolWords((prev) => prev.filter((w) => w.id !== wordObj.id));
+      setPuzzleErrorFlash(false);
+
+      if (nextSelected.length === puzzleTargetWords.length) {
+        setPuzzleCompleted(true);
+        const fullSentence = puzzleTargetWords.map((w) => w.word).join(' ');
+        setTimeout(() => {
+          speakText(fullSentence, { rate: 0.9, accent });
+        }, 300);
+        if (onAwardXP) {
+          onAwardXP(20, 'Frase montada com perfeição! (+20 XP)');
+        }
+      }
+    } else {
+      setPuzzleErrorFlash(true);
+      setTimeout(() => setPuzzleErrorFlash(false), 550);
+    }
+  };
+
+  // ✨ Extrator Inteligente: Salva as 5 palavras/expressões mais úteis do texto/música em 1 toque
+  const handleExtractTop5Words = async () => {
+    if (isExtractingWords) return;
+    setIsExtractingWords(true);
+
+    try {
+      const stopWords = new Set([
+        'the',
+        'and',
+        'for',
+        'that',
+        'this',
+        'with',
+        'you',
+        'your',
+        'are',
+        'was',
+        'were',
+        'from',
+        'have',
+        'has',
+        'had',
+        'not',
+        'but',
+        'what',
+        'all',
+        'when',
+        'can',
+        'they',
+        'there',
+        'been',
+        'into',
+        'more',
+        'will',
+        'about',
+        'like',
+        'just',
+      ]);
+
+      const candidates = [];
+      const seen = new Set(
+        flashcards.map((c) => c.word.toLowerCase().trim())
+      );
+
+      // 1. Prioriza expressões curadas do próprio texto
+      if (activeText.vocabulary) {
+        for (const [, vocabItem] of Object.entries(activeText.vocabulary)) {
+          const cleanW = vocabItem.word.toLowerCase().trim();
+          if (!seen.has(cleanW)) {
+            seen.add(cleanW);
+            candidates.push({
+              word: vocabItem.word,
+              translation: vocabItem.translation,
+              example: vocabItem.example || activeText.paragraphs[0]?.en || '',
+              exampleTranslation: activeText.paragraphs[0]?.pt || '',
+            });
+          }
+          if (candidates.length >= 5) break;
+        }
+      }
+
+      // 2. Complementa com palavras ricas das estrofes/parágrafos
+      if (candidates.length < 5) {
+        for (const para of activeText.paragraphs) {
+          const tokens = para.en
+            .replace(/🎵/g, '')
+            .split(/\s+/)
+            .map((t) =>
+              t
+                .toLowerCase()
+                .replace(/’/g, "'")
+                .replace(/[^a-z'-]/g, '')
+                .replace(/^-+|-+$/g, '')
+            )
+            .filter(
+              (t) => t.length >= 4 && !stopWords.has(t) && !seen.has(t)
+            );
+
+          for (const tok of tokens) {
+            seen.add(tok);
+            const dictEntry =
+              COMMON_DICTIONARY[tok] ||
+              COMMON_DICTIONARY[tok.replace(/s$/, '')] ||
+              COMMON_DICTIONARY[tok.replace(/ed$/, '')];
+            let meaning = dictEntry?.translation || '';
+            if (!meaning) {
+              try {
+                const res = await fetch(
+                  `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=pt&dt=t&q=${encodeURIComponent(
+                    tok
+                  )}`
+                );
+                const data = await res.json();
+                meaning = data?.[0]?.[0]?.[0]?.trim()?.toLowerCase() || tok;
+              } catch {
+                meaning = tok;
+              }
+            }
+            candidates.push({
+              word: tok,
+              translation: meaning,
+              example: para.en.replace(/🎵/g, '').trim(),
+              exampleTranslation: para.pt.replace(/🎵/g, '').trim(),
+            });
+            if (candidates.length >= 5) break;
+          }
+          if (candidates.length >= 5) break;
+        }
+      }
+
+      for (const item of candidates) {
+        onAddFlashcard({
+          word: item.word,
+          phonetic: generatePortuguesePhonetics(item.word),
+          translation: item.translation,
+          usageExplanation: `Extraído automaticamente de "${activeText.title}"`,
+          example: item.example,
+          exampleTranslation: item.exampleTranslation,
+          deck: 'Top 5 de Músicas & Textos',
+          level: activeText.level,
+        });
+      }
+    } finally {
+      setIsExtractingWords(false);
+    }
+  };
 
   const handlePlayAll = () => {
     if (playingParagraphIdx !== null) {
@@ -890,9 +1182,17 @@ export default function InteractiveReader({
     ];
 
     resolvedParagraphs.forEach((p, idx) => {
+      const links = detectConnectedSpeech(p.en);
       lines.push(`[Trecho ${idx + 1}]`);
       lines.push(`🇺🇸 Inglês:    ${p.en}`);
       lines.push(`🗣️ Pronúncia: ${generatePortuguesePhonetics(p.en)}`);
+      if (links.length > 0) {
+        lines.push(
+          `⚡ Junção Nativa: ${links
+            .map((l) => `"${l.original}" soa "${l.nativeSound}"`)
+            .join(' | ')}`
+        );
+      }
       lines.push(`🇧🇷 Tradução:  ${p.pt}`);
       lines.push('');
     });
@@ -1271,6 +1571,217 @@ export default function InteractiveReader({
             </div>
           </div>
 
+          {/* Barra Organizada de Superpoderes de Aprendizado */}
+          <div className="flex flex-wrap items-center gap-2 py-2.5 px-3.5 mb-4 rounded-xl bg-gradient-to-r from-indigo-950/60 via-slate-900 to-emerald-950/40 border border-indigo-500/30 text-xs">
+            <span className="font-bold text-indigo-300 flex items-center gap-1 mr-1">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              Aceleradores:
+            </span>
+
+            <button
+              type="button"
+              onClick={handleToggleLessonMode}
+              className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition border ${
+                isLessonMode
+                  ? 'bg-rose-600 border-rose-400 text-white animate-pulse shadow-lg'
+                  : 'bg-slate-900/90 hover:bg-indigo-600/30 border-indigo-500/40 text-indigo-200'
+              }`}
+              title="Ouça a tradução em Português + Inglês Lento + Inglês Natural sem precisar tocar na tela"
+            >
+              <Headphones className="w-3.5 h-3.5" />
+              <span>
+                {isLessonMode
+                  ? '⏹ Parar Aula no Fone'
+                  : '🎧 Aula no Fone (PT+EN)'}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setShowSentenceBuilder((prev) => !prev);
+                if (!showSentenceBuilder) initSentencePuzzle(0, activeText);
+              }}
+              className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition border ${
+                showSentenceBuilder
+                  ? 'bg-indigo-600 border-indigo-400 text-white shadow'
+                  : 'bg-slate-900/90 hover:bg-slate-800 border-slate-700 text-emerald-300'
+              }`}
+              title="Pratique a montagem das frases deste texto com 1 toque sem precisar digitar"
+            >
+              <Puzzle className="w-3.5 h-3.5" />
+              <span>🧩 Montar Frases</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExtractTop5Words}
+              disabled={isExtractingWords}
+              className="px-3 py-1.5 rounded-lg bg-slate-900/90 hover:bg-emerald-600/25 border border-emerald-500/40 text-emerald-200 font-bold flex items-center gap-1.5 transition disabled:opacity-50"
+              title="Extrai e salva automaticamente as 5 palavras mais importantes deste texto nos seus Flashcards"
+            >
+              {isExtractingWords ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Plus className="w-3.5 h-3.5" />
+              )}
+              <span>✨ Salvar Top 5 Palavras</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowConnectedSpeech((prev) => !prev)}
+              className={`px-2.5 py-1.5 rounded-lg font-bold flex items-center gap-1 transition border ml-auto ${
+                showConnectedSpeech
+                  ? 'bg-amber-500/20 border-amber-500/40 text-amber-200'
+                  : 'bg-slate-900/80 border-slate-800 text-slate-400'
+              }`}
+              title="Mostra onde os nativos emendam uma palavra na outra na fala rápida"
+            >
+              <Zap className="w-3.5 h-3.5 text-amber-400" />
+              <span>
+                {showConnectedSpeech ? 'Raio-X Nativo: ON' : 'Raio-X Nativo'}
+              </span>
+            </button>
+          </div>
+
+          {/* Banner de Status do Modo Aula Mãos-Livres (Só aparece quando ativo) */}
+          {isLessonMode && (
+            <div className="mb-4 p-3 rounded-xl bg-indigo-950/80 border border-indigo-400/50 flex items-center justify-between gap-3 text-xs text-indigo-100 shadow-lg">
+              <div className="flex items-center gap-2 min-w-0">
+                <Headphones className="w-4 h-4 text-emerald-400 animate-bounce shrink-0" />
+                <span className="font-bold truncate">{lessonStepLabel}</span>
+              </div>
+              <button
+                type="button"
+                onClick={stopLessonMode}
+                className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold shrink-0"
+              >
+                Encerrar
+              </button>
+            </div>
+          )}
+
+          {/* Painel Colapsável: Desafio "Monte a Frase com 1 Toque" (Sem Digitar) */}
+          {showSentenceBuilder && (
+            <div className="mb-5 p-4 rounded-2xl bg-slate-950/90 border border-indigo-500/40 space-y-3 shadow-xl">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/20 border border-indigo-500/30 text-[11px] font-extrabold text-indigo-300">
+                    🧩 Monte a Frase (Toque nas Palavras na Ordem)
+                  </span>
+                  <span className="text-xs text-slate-400">
+                    Trecho {puzzleParaIdx + 1} de {activeText.paragraphs.length}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      initSentencePuzzle(puzzleParaIdx, activeText)
+                    }
+                    className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1"
+                  >
+                    <RotateCcw className="w-3 h-3" /> Reiniciar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      initSentencePuzzle(puzzleParaIdx + 1, activeText)
+                    }
+                    className="px-2.5 py-1 rounded-lg bg-indigo-600/30 hover:bg-indigo-600 text-indigo-200 hover:text-white text-xs font-bold"
+                  >
+                    Próximo Trecho →
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowSentenceBuilder(false)}
+                    className="p-1 rounded-lg text-slate-400 hover:text-white"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Frase em Português como Guia */}
+              <div className="p-2.5 rounded-xl bg-emerald-950/30 border border-emerald-500/25 text-xs sm:text-sm text-emerald-200 font-medium">
+                🇧🇷 <strong>Tradução:</strong> “
+                {isMissingTranslation(
+                  activeText.paragraphs[puzzleParaIdx]?.pt,
+                  activeText.paragraphs[puzzleParaIdx]?.en
+                )
+                  ? translateLineOfflineFallback(
+                      activeText.paragraphs[puzzleParaIdx]?.en
+                    )
+                  : activeText.paragraphs[puzzleParaIdx]?.pt
+                      ?.replace(/🎵/g, '')
+                      .trim()}
+                ”
+              </div>
+
+              {/* Área da Frase Sendo Montada */}
+              <div
+                className={`min-h-[48px] p-3 rounded-xl border flex flex-wrap items-center gap-1.5 transition ${
+                  puzzleErrorFlash
+                    ? 'bg-rose-950/40 border-rose-500'
+                    : puzzleCompleted
+                    ? 'bg-emerald-950/40 border-emerald-500'
+                    : 'bg-slate-900/90 border-slate-800'
+                }`}
+              >
+                {puzzleSelectedWords.length === 0 ? (
+                  <span className="text-xs text-slate-500 italic">
+                    Toque nas palavras em inglês abaixo na ordem certa para montar a frase...
+                  </span>
+                ) : (
+                  puzzleSelectedWords.map((wObj) => (
+                    <span
+                      key={wObj.id}
+                      className="px-2.5 py-1 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 text-xs sm:text-sm font-bold"
+                    >
+                      {wObj.word}
+                    </span>
+                  ))
+                )}
+              </div>
+
+              {/* Blocos Embaralhados para Tocar */}
+              {!puzzleCompleted ? (
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  {puzzlePoolWords.map((wObj) => (
+                    <button
+                      key={wObj.id}
+                      type="button"
+                      onClick={() => handleTapPuzzleWord(wObj)}
+                      className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-indigo-600 text-slate-100 hover:text-white border border-slate-700 text-xs sm:text-sm font-bold transition shadow active:scale-95"
+                    >
+                      {wObj.word}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs text-emerald-300 font-bold">
+                  <span>
+                    🎉 Perfeito! Pronúncia: “
+                    {generatePortuguesePhonetics(
+                      puzzleTargetWords.map((w) => w.word).join(' ')
+                    )}
+                    ”
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      initSentencePuzzle(puzzleParaIdx + 1, activeText)
+                    }
+                    className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold"
+                  >
+                    Montar Próxima Frase →
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Parágrafos Interativos + Botão de Shadowing Integrado */}
           <div className="space-y-5 mt-4">
             {activeText.paragraphs.map((para, pIdx) => {
@@ -1279,6 +1790,9 @@ export default function InteractiveReader({
                 isRecordingShadow && shadowingParaIdx === pIdx;
               const shadowEval = shadowResultsByPara[pIdx];
               const hasMusicNote = para.en.includes('🎵');
+              const connectedLinks = showConnectedSpeech
+                ? detectConnectedSpeech(para.en)
+                : [];
               const tokens = para.en
                 .replace(/🎵/g, '')
                 .trim()
@@ -1363,6 +1877,38 @@ export default function InteractiveReader({
                           🗣️ <strong>Como soa:</strong> “
                           {generatePortuguesePhonetics(para.en)}”
                         </p>
+
+                        {/* Raio-X Nativo: Como os nativos emendam os sons neste trecho */}
+                        {connectedLinks.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1.5 py-0.5">
+                            <span className="text-[11px] font-bold text-indigo-300 flex items-center gap-1">
+                              <Zap className="w-3 h-3 text-amber-400 shrink-0" />
+                              Fala Conectada:
+                            </span>
+                            {connectedLinks.map((lnk, lIdx) => (
+                              <button
+                                key={lIdx}
+                                type="button"
+                                onClick={() =>
+                                  speakText(lnk.original, {
+                                    rate: 0.95,
+                                    accent,
+                                  })
+                                }
+                                title={`${lnk.tip} (Toque para ouvir junto)`}
+                                className="px-2 py-0.5 rounded-md bg-indigo-950/80 hover:bg-indigo-800/80 border border-indigo-500/30 text-[11px] text-indigo-200 flex items-center gap-1 transition"
+                              >
+                                <span className="underline decoration-dotted">
+                                  “{lnk.original}”
+                                </span>
+                                <span className="text-amber-300 font-bold">
+                                  → “{lnk.nativeSound}” 🔊
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
                         <p className="text-xs sm:text-sm font-medium text-emerald-200/95 bg-emerald-950/25 border border-emerald-500/20 px-2.5 py-1.5 rounded-xl break-words">
                           🇧🇷 <strong>Tradução:</strong>{' '}
                           {isMissingTranslation(para.pt, para.en)
