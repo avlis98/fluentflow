@@ -86,7 +86,54 @@ const SCENARIO_QUICK_REPLIES = {
   ],
 };
 
-// Avatar Ilustrado Animado com Sincronia Labial (Lip-Sync) e Expressões Faciais
+// Perfis Executivos de Alta Definição (Studio HD Portraits + HUD de Chamada de Vídeo)
+const SCENARIO_AVATAR_PROFILES = {
+  'coffee-shop': {
+    photo: './avatars/maya.jpg',
+    name: 'Maya Lin',
+    roleLabel: 'Lead Barista • Manhattan, NY',
+    accentBadge: '🇺🇸 EN-US • Studio HD',
+    ringSpeaking:
+      'border-emerald-400 shadow-[0_0_28px_rgba(16,185,129,0.55)]',
+    ringIdle: 'border-emerald-500/40 shadow-lg',
+    barColor: 'bg-emerald-400',
+    badgeBg: 'bg-emerald-500 text-slate-950',
+  },
+  'airport-immigration': {
+    photo: './avatars/miller.jpg',
+    name: 'Officer Miller',
+    roleLabel: 'US Customs • JFK Terminal 4',
+    accentBadge: '🇺🇸 EN-US • Official HD',
+    ringSpeaking: 'border-sky-400 shadow-[0_0_28px_rgba(56,189,248,0.55)]',
+    ringIdle: 'border-sky-500/40 shadow-lg',
+    barColor: 'bg-sky-400',
+    badgeBg: 'bg-sky-400 text-slate-950',
+  },
+  'tech-interview': {
+    photo: './avatars/sarah.jpg',
+    name: 'Sarah Jenkins',
+    roleLabel: 'Tech Hiring Manager • Silicon Valley',
+    accentBadge: '🇺🇸 EN-US • Executive Call',
+    ringSpeaking:
+      'border-indigo-400 shadow-[0_0_28px_rgba(129,140,248,0.6)]',
+    ringIdle: 'border-indigo-500/40 shadow-lg',
+    barColor: 'bg-indigo-400',
+    badgeBg: 'bg-indigo-400 text-slate-950',
+  },
+  'hotel-problem': {
+    photo: './avatars/oliver.jpg',
+    name: 'Oliver Vance',
+    roleLabel: 'Chief Concierge • Kensington, London',
+    accentBadge: '🇬🇧 EN-GB • Luxury VIP',
+    ringSpeaking:
+      'border-amber-400 shadow-[0_0_28px_rgba(251,191,36,0.55)]',
+    ringIdle: 'border-amber-500/40 shadow-lg',
+    barColor: 'bg-amber-400',
+    badgeBg: 'bg-amber-400 text-slate-950',
+  },
+};
+
+// Avatar Executivo em Estilo Chamada de Vídeo VIP (Retrato Fotográfico HD + Equalizador Neural de Voz)
 function AnimatedCharacterAvatar({
   scenarioId,
   isSpeaking,
@@ -94,288 +141,137 @@ function AnimatedCharacterAvatar({
   mouthViseme = 'closed',
   mood = 'friendly',
 }) {
-  const configs = {
-    'coffee-shop': {
-      bgGrad: 'from-amber-500/30 via-emerald-600/20 to-slate-900',
-      ringColor: isSpeaking
-        ? 'border-emerald-400 shadow-emerald-500/30'
-        : isListening
-        ? 'border-amber-400 shadow-amber-500/30'
-        : 'border-indigo-500/40',
-      skin: '#F4C29F',
-      hair: '#3B2314',
-      shirt: '#059669',
-      accentColor: '#F59E0B',
-      hasGlasses: true,
-      hasCap: false,
-      hasBowtie: false,
-      hasHeadset: false,
-    },
-    'airport-immigration': {
-      bgGrad: 'from-blue-600/30 via-indigo-900/30 to-slate-900',
-      ringColor: isSpeaking
-        ? 'border-sky-400 shadow-sky-500/30'
-        : isListening
-        ? 'border-amber-400 shadow-amber-500/30'
-        : 'border-blue-500/40',
-      skin: '#E0AC8B',
-      hair: '#1E293B',
-      shirt: '#1E3A8A',
-      accentColor: '#FBBF24',
-      hasGlasses: false,
-      hasCap: true,
-      hasBowtie: false,
-      hasHeadset: false,
-    },
-    'tech-interview': {
-      bgGrad: 'from-indigo-600/30 via-purple-900/25 to-slate-900',
-      ringColor: isSpeaking
-        ? 'border-indigo-400 shadow-indigo-500/30'
-        : isListening
-        ? 'border-amber-400 shadow-amber-500/30'
-        : 'border-indigo-500/40',
-      skin: '#F7CBA8',
-      hair: '#7C2D12',
-      shirt: '#4F46E5',
-      accentColor: '#34D399',
-      hasGlasses: false,
-      hasCap: false,
-      hasBowtie: false,
-      hasHeadset: true,
-    },
-    'hotel-problem': {
-      bgGrad: 'from-rose-600/25 via-amber-900/20 to-slate-900',
-      ringColor: isSpeaking
-        ? 'border-amber-400 shadow-amber-500/30'
-        : isListening
-        ? 'border-emerald-400 shadow-emerald-500/30'
-        : 'border-amber-500/40',
-      skin: '#F3C6A5',
-      hair: '#475569',
-      shirt: '#881337',
-      accentColor: '#FBBF24',
-      hasGlasses: false,
-      hasCap: false,
-      hasBowtie: true,
-      hasHeadset: false,
-    },
+  const profile =
+    SCENARIO_AVATAR_PROFILES[scenarioId] ||
+    SCENARIO_AVATAR_PROFILES['coffee-shop'];
+
+  // Alturas dinâmicas das 11 barras de onda neural sincronizadas com os fonemas (visemas) da fala
+  const waveMultipliers = {
+    closed: [0.22, 0.3, 0.25, 0.35, 0.28, 0.4, 0.28, 0.35, 0.25, 0.3, 0.22],
+    open: [0.45, 0.75, 0.6, 0.95, 0.7, 1.0, 0.78, 0.9, 0.58, 0.72, 0.42],
+    wide: [0.6, 0.88, 0.95, 0.72, 1.0, 0.85, 0.98, 0.75, 0.92, 0.8, 0.55],
+    round: [0.35, 0.62, 0.88, 0.98, 0.92, 1.0, 0.92, 0.98, 0.88, 0.62, 0.35],
   };
 
-  const cfg = configs[scenarioId] || configs['coffee-shop'];
+  const listeningBars = [
+    0.35, 0.55, 0.45, 0.7, 0.5, 0.8, 0.5, 0.7, 0.45, 0.55, 0.35,
+  ];
+  const idleBars = [
+    0.18, 0.22, 0.18, 0.25, 0.2, 0.28, 0.2, 0.25, 0.18, 0.22, 0.18,
+  ];
 
-  const renderMouth = () => {
-    if (!isSpeaking) {
-      if (mood === 'happy') {
-        return (
-          <path
-            d="M 40 66 Q 50 75 60 66 Z"
-            fill="#991B1B"
-            stroke="#7F1D1D"
-            strokeWidth="1.5"
-          />
-        );
-      }
-      return (
-        <path
-          d="M 41 67 Q 50 72 59 67"
-          fill="none"
-          stroke="#7C2D12"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-        />
-      );
-    }
+  const activeBars = isSpeaking
+    ? waveMultipliers[mouthViseme] || waveMultipliers.open
+    : isListening
+    ? listeningBars
+    : idleBars;
 
-    if (mouthViseme === 'round') {
-      return (
-        <ellipse
-          cx="50"
-          cy="68"
-          rx="5.5"
-          ry="6.5"
-          fill="#7F1D1D"
-          stroke="#450A0A"
-          strokeWidth="1.5"
-        />
-      );
-    }
-    if (mouthViseme === 'wide') {
-      return (
-        <g>
-          <rect
-            x="39"
-            y="63"
-            width="22"
-            height="10"
-            rx="5"
-            fill="#7F1D1D"
-            stroke="#450A0A"
-            strokeWidth="1.5"
-          />
-          <rect x="42" y="64" width="16" height="3" rx="1" fill="#FFFFFF" />
-        </g>
-      );
-    }
-    if (mouthViseme === 'open') {
-      return (
-        <ellipse
-          cx="50"
-          cy="68"
-          rx="8"
-          ry="4.5"
-          fill="#991B1B"
-          stroke="#450A0A"
-          strokeWidth="1.5"
-        />
-      );
-    }
-    return (
-      <path
-        d="M 42 67 Q 50 70 58 67"
-        fill="none"
-        stroke="#7C2D12"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-      />
-    );
-  };
+  const ringClass = isSpeaking
+    ? profile.ringSpeaking
+    : isListening
+    ? 'border-amber-400 shadow-[0_0_26px_rgba(251,191,36,0.5)]'
+    : profile.ringIdle;
 
   return (
-    <div className="relative flex flex-col items-center justify-center shrink-0">
-      {/* Ondas sonoras animadas ao redor do avatar quando fala ou escuta */}
+    <div className="relative flex flex-col items-center justify-center shrink-0 select-none">
+      {/* Halo Luminoso Externo em Chamada Ativa */}
       {(isSpeaking || isListening) && (
         <div
-          className={`absolute -inset-1.5 rounded-3xl animate-pulse border-2 ${
+          className={`absolute -inset-1.5 rounded-3xl animate-pulse border ${
             isSpeaking ? 'border-emerald-400/50' : 'border-amber-400/60'
-          }`}
+          } pointer-events-none`}
         />
       )}
 
+      {/* Moldura de Vídeo Executiva HD */}
       <div
-        className={`relative w-24 h-24 sm:w-28 sm:h-28 rounded-3xl bg-gradient-to-b ${cfg.bgGrad} border-2 ${cfg.ringColor} shadow-xl overflow-hidden flex items-center justify-center transition-transform duration-300 ${
-          isListening ? '-rotate-2 scale-105' : isSpeaking ? 'scale-105' : ''
+        className={`relative w-32 h-36 sm:w-36 sm:h-40 rounded-3xl bg-slate-950 border-2 ${ringClass} overflow-hidden transition-all duration-300 ${
+          isSpeaking
+            ? 'scale-[1.03]'
+            : isListening
+            ? 'scale-[1.02]'
+            : 'hover:scale-[1.01]'
         }`}
       >
-        <svg viewBox="0 0 100 100" className="w-full h-full">
-          {/* Ombros / Roupa */}
-          <path d="M 16 100 Q 50 78 84 100 Z" fill={cfg.shirt} />
+        {/* Retrato de Estúdio Fotográfico em Alta Definição */}
+        <img
+          src={profile.photo}
+          alt={profile.name}
+          className={`w-full h-full object-cover object-top transition-transform duration-700 ease-out ${
+            isSpeaking
+              ? 'scale-110 brightness-105'
+              : isListening
+              ? 'scale-105'
+              : 'scale-100'
+          }`}
+        />
 
-          {/* Gravata borboleta ou uniforme */}
-          {cfg.hasBowtie && (
-            <polygon points="43,85 57,91 57,85 43,91" fill={cfg.accentColor} />
-          )}
+        {/* Vinheta Cinematográfica Suave para Leitura Perfeita do HUD */}
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/25 to-slate-950/40 pointer-events-none" />
 
-          {/* Pescoço */}
-          <rect x="43" y="72" width="14" height="14" rx="4" fill={cfg.skin} />
-
-          {/* Cabelo de fundo */}
-          <circle cx="50" cy="46" r="25" fill={cfg.hair} />
-
-          {/* Rosto */}
-          <ellipse cx="50" cy="50" rx="21" ry="24" fill={cfg.skin} />
-
-          {/* Bochechas coradas */}
-          <circle cx="36" cy="58" r="3.5" fill="#F43F5E" opacity="0.22" />
-          <circle cx="64" cy="58" r="3.5" fill="#F43F5E" opacity="0.22" />
-
-          {/* Cabelo topo / Quepe de Oficial */}
-          {cfg.hasCap ? (
-            <g>
-              <path d="M 25 34 Q 50 18 75 34 Z" fill="#1E3A8A" />
-              <rect x="24" y="32" width="52" height="5" rx="2" fill="#0F172A" />
-              <circle cx="50" cy="27" r="3.5" fill="#FBBF24" />
-            </g>
-          ) : (
-            <path
-              d="M 28 42 Q 50 22 72 42 Q 65 28 50 28 Q 35 28 28 42 Z"
-              fill={cfg.hair}
+        {/* HUD Superior: Indicador Live HD + Humor */}
+        <div className="absolute top-2 inset-x-2 flex items-center justify-between gap-1 pointer-events-none">
+          <span className="px-2 py-0.5 rounded-full bg-slate-950/80 backdrop-blur-md border border-white/15 text-[9px] font-extrabold tracking-wider text-white flex items-center gap-1 shadow">
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                isSpeaking
+                  ? 'bg-emerald-400 animate-ping'
+                  : isListening
+                  ? 'bg-amber-400 animate-ping'
+                  : 'bg-emerald-400'
+              }`}
             />
-          )}
-
-          {/* Sobrancelhas expressivas */}
-          <path
-            d={
-              isSpeaking || isListening
-                ? 'M 36 41 Q 41 38 45 41'
-                : 'M 36 43 Q 41 41 45 43'
-            }
-            fill="none"
-            stroke={cfg.hair}
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-          <path
-            d={
-              isSpeaking || isListening
-                ? 'M 55 41 Q 59 38 64 41'
-                : 'M 55 43 Q 59 41 64 43'
-            }
-            fill="none"
-            stroke={cfg.hair}
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-
-          {/* Olhos */}
-          <circle cx="41" cy="49" r="2.7" fill="#0F172A" />
-          <circle cx="59" cy="49" r="2.7" fill="#0F172A" />
-          <circle cx="42" cy="48" r="0.9" fill="#FFFFFF" />
-          <circle cx="60" cy="48" r="0.9" fill="#FFFFFF" />
-
-          {/* Óculos (Maya) */}
-          {cfg.hasGlasses && (
-            <g stroke="#1E293B" strokeWidth="1.6" fill="none">
-              <circle cx="41" cy="49" r="6" />
-              <circle cx="59" cy="49" r="6" />
-              <line x1="47" y1="49" x2="53" y2="49" />
-            </g>
-          )}
-
-          {/* Nariz */}
-          <path
-            d="M 50 51 Q 52 57 49 59"
-            fill="none"
-            stroke="#C68B63"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-          />
-
-          {/* Boca com Lip-Sync */}
-          {renderMouth()}
-
-          {/* Headset (Sarah) */}
-          {cfg.hasHeadset && (
-            <g>
-              <path
-                d="M 28 50 Q 28 23 50 23 Q 72 23 72 50"
-                fill="none"
-                stroke="#334155"
-                strokeWidth="2.5"
-              />
-              <rect x="25" y="45" width="5" height="10" rx="2" fill="#4F46E5" />
-              <path
-                d="M 28 53 Q 34 68 44 68"
-                fill="none"
-                stroke="#334155"
-                strokeWidth="1.8"
-              />
-            </g>
-          )}
-        </svg>
-
-        {/* Indicador de Status do Avatar */}
-        <div className="absolute bottom-1.5 inset-x-1.5 flex justify-center">
-          <span
-            className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider shadow ${
-              isSpeaking
-                ? 'bg-emerald-500 text-slate-950'
-                : isListening
-                ? 'bg-amber-400 text-slate-950'
-                : 'bg-slate-900/90 text-slate-300 border border-slate-700'
-            }`}
-          >
-            {isSpeaking ? '🔊 Falando' : isListening ? '👂 Ouvindo' : '● Online'}
+            LIVE HD
           </span>
+
+          {mood === 'happy' && (
+            <span
+              className="px-1.5 py-0.5 rounded-full bg-emerald-500/90 text-slate-950 text-[9px] font-black shadow"
+              title="Missão cumprida!"
+            >
+              ★ +XP
+            </span>
+          )}
+        </div>
+
+        {/* HUD Inferior: Equalizador Neural de Voz + Status e Nome do Executivo */}
+        <div className="absolute bottom-0 inset-x-0 p-2 bg-gradient-to-t from-slate-950 via-slate-950/90 to-transparent flex flex-col items-center gap-1 pointer-events-none">
+          {/* Equalizador de Voz Sincronizado em Tempo Real */}
+          <div className="h-4 flex items-end justify-center gap-[3px] w-full px-2">
+            {activeBars.map((val, idx) => (
+              <span
+                key={idx}
+                style={{
+                  height: `${Math.max(3, Math.round(val * 16))}px`,
+                }}
+                className={`w-1 rounded-full transition-all duration-100 ${
+                  isSpeaking
+                    ? profile.barColor
+                    : isListening
+                    ? 'bg-amber-400'
+                    : 'bg-slate-500/60'
+                }`}
+              />
+            ))}
+          </div>
+
+          {/* Nome do Personagem e Status da Chamada */}
+          <div className="w-full flex items-center justify-between gap-1 px-0.5">
+            <span className="text-[10px] font-extrabold text-white truncate">
+              {profile.name}
+            </span>
+            <span
+              className={`px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase tracking-wider shrink-0 ${
+                isSpeaking
+                  ? profile.badgeBg
+                  : isListening
+                  ? 'bg-amber-400 text-slate-950'
+                  : 'bg-slate-800/90 text-emerald-300 border border-slate-700'
+              }`}
+            >
+              {isSpeaking ? 'Falando' : isListening ? 'Ouvindo' : 'Online'}
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -750,31 +646,42 @@ Respond in valid JSON with keys:
           <div className="space-y-2">
             {filteredScenarios.map((scen) => {
               const isSelected = scen.id === scenario.id;
+              const scenProfile =
+                SCENARIO_AVATAR_PROFILES[scen.id] ||
+                SCENARIO_AVATAR_PROFILES['coffee-shop'];
               return (
                 <button
                   key={scen.id}
                   onClick={() => setActiveScenarioId(scen.id)}
-                  className={`w-full text-left p-3 rounded-xl border transition flex items-start gap-3 ${
+                  className={`w-full text-left p-3 rounded-xl border transition flex items-center gap-3 ${
                     isSelected
                       ? 'bg-indigo-600/20 border-indigo-500 shadow-lg'
                       : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
                   }`}
                 >
-                  <div className="text-2xl w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center shrink-0">
-                    {scen.avatar}
+                  <div className="relative w-12 h-12 rounded-xl bg-slate-900 border border-slate-700 overflow-hidden shrink-0 shadow-md">
+                    <img
+                      src={scenProfile.photo}
+                      alt={scenProfile.name}
+                      className="w-full h-full object-cover object-top"
+                    />
+                    <span className="absolute bottom-0.5 right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-slate-950" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-indigo-300">
                         {scen.level}
                       </span>
-                      <span className="text-[11px] text-slate-400 truncate">
-                        {scen.role}
+                      <span className="text-[11px] font-semibold text-emerald-300 truncate">
+                        {scenProfile.name}
                       </span>
                     </div>
                     <h3 className="text-sm font-bold text-white truncate mt-0.5">
                       {scen.title}
                     </h3>
+                    <p className="text-[11px] text-slate-400 truncate">
+                      {scenProfile.roleLabel}
+                    </p>
                   </div>
                 </button>
               );
@@ -836,10 +743,18 @@ Respond in valid JSON with keys:
             <div className="flex-1 min-w-0 space-y-2 text-center sm:text-left w-full">
               <div className="flex flex-wrap items-center justify-center sm:justify-between gap-2">
                 <div>
-                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-400 block">
-                    🎭 Conversa Ao Vivo com Avatar IA
-                  </span>
-                  <h2 className="text-sm sm:text-base font-extrabold text-white">
+                  <div className="flex flex-wrap items-center justify-center sm:justify-start gap-1.5">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                      📹 Chamada Executiva HD
+                    </span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-indigo-300 border border-slate-700">
+                      {(
+                        SCENARIO_AVATAR_PROFILES[scenario.id] ||
+                        SCENARIO_AVATAR_PROFILES['coffee-shop']
+                      ).accentBadge}
+                    </span>
+                  </div>
+                  <h2 className="text-sm sm:text-base font-extrabold text-white mt-1">
                     {scenario.role} • {scenario.title}
                   </h2>
                 </div>
@@ -935,10 +850,17 @@ Respond in valid JSON with keys:
         <div className="flex-1 p-3.5 sm:p-5 space-y-4 overflow-y-auto max-h-[44dvh] sm:max-h-[340px]">
           {messages.map((msg) => {
             if (msg.sender === 'ai') {
+              const activeProfile =
+                SCENARIO_AVATAR_PROFILES[scenario.id] ||
+                SCENARIO_AVATAR_PROFILES['coffee-shop'];
               return (
                 <div key={msg.id} className="flex items-start gap-3 max-w-xl">
-                  <div className="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-lg shrink-0">
-                    {scenario.avatar}
+                  <div className="w-10 h-10 rounded-xl bg-slate-800 border border-indigo-500/40 overflow-hidden shrink-0 shadow-md">
+                    <img
+                      src={activeProfile.photo}
+                      alt={activeProfile.name}
+                      className="w-full h-full object-cover object-top"
+                    />
                   </div>
                   <div className="bg-slate-950 border border-slate-800 rounded-2xl rounded-tl-sm p-3.5 space-y-2">
                     <div className="flex items-start justify-between gap-2">
