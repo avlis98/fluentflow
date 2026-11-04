@@ -221,50 +221,73 @@ export default function InteractiveReader({
     recognition.start();
   };
 
-  const handleWordClick = (rawToken, paragraphSentence, paragraphTranslation) => {
+  const handleWordClick = async (
+    rawToken,
+    paragraphSentence,
+    paragraphTranslation
+  ) => {
     const cleanKey = rawToken
       .toLowerCase()
-      .replace(/[^a-z']/g, '')
+      .replace(/’/g, "'")
+      .replace(/[^a-z'-]/g, '')
+      .replace(/^-+|-+$/g, '')
       .trim();
     if (!cleanKey) return;
 
-    const curated = activeText.vocabulary?.[cleanKey];
+    const strippedKey = cleanKey.replace(/[^a-z']/g, '');
+    const curated =
+      activeText.vocabulary?.[cleanKey] || activeText.vocabulary?.[strippedKey];
     const common =
       COMMON_DICTIONARY[cleanKey] ||
+      COMMON_DICTIONARY[strippedKey] ||
       COMMON_DICTIONARY[cleanKey.replace(/s$/, '')] ||
       COMMON_DICTIONARY[cleanKey.replace(/ed$/, '')];
 
     const displayWord = curated ? curated.word : cleanKey;
     const readablePhonetic = generatePortuguesePhonetics(displayWord);
+    const directTranslation = curated
+      ? curated.translation
+      : common?.translation || '';
 
-    const info = curated
-      ? {
-          word: curated.word,
-          phonetic: readablePhonetic,
-          translation: curated.translation,
-          partOfSpeech: curated.partOfSpeech,
-          usageExplanation: `Bloco/expressão de nível ${activeText.level} usado em "${activeText.title}".`,
-          example: curated.example || paragraphSentence,
-          exampleTranslation: paragraphTranslation,
-          isCurated: true,
-        }
-      : {
-          word: cleanKey,
-          phonetic: readablePhonetic,
-          translation:
-            common?.translation ||
-            paragraphTranslation ||
-            'Edite a tradução abaixo ou salve a frase completa',
-          partOfSpeech: 'Bloco Contextual',
-          usageExplanation: 'Extraído diretamente da frase original do texto.',
-          example: paragraphSentence,
-          exampleTranslation: paragraphTranslation,
-          isCurated: false,
-        };
+    const info = {
+      word: displayWord,
+      phonetic: readablePhonetic,
+      translation: directTranslation || 'Traduzindo palavra...',
+      usageExplanation: curated
+        ? `Expressão usada em "${activeText.title}".`
+        : 'Tradução direta da palavra tocada.',
+      example: curated?.example || paragraphSentence,
+      exampleTranslation: paragraphTranslation,
+      isCurated: Boolean(curated),
+    };
 
     setSelectedWordInfo(info);
     setCustomWordTranslation(info.translation);
     speakText(info.word, { rate: 0.95, accent });
+
+    if (!directTranslation) {
+      try {
+        const res = await fetch(
+          `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=pt&dt=t&q=${encodeURIComponent(
+            cleanKey
+          )}`
+        );
+        const data = await res.json();
+        const translatedWord = data?.[0]?.[0]?.[0]?.trim()?.toLowerCase();
+        const finalMeaning =
+          translatedWord && translatedWord !== cleanKey
+            ? translatedWord
+            : cleanKey;
+        setCustomWordTranslation(finalMeaning);
+        setSelectedWordInfo((prev) =>
+          prev && prev.word === displayWord
+            ? { ...prev, translation: finalMeaning }
+            : prev
+        );
+      } catch {
+        setCustomWordTranslation(cleanKey);
+      }
+    }
   };
 
   const isWordInDeck = (word) => {
@@ -346,6 +369,29 @@ export default function InteractiveReader({
       } catch {
         // Fallback offline se a chamada falhar
       }
+      setIsTranslatingAI(false);
+    }
+
+    setIsTranslatingAI(true);
+    try {
+      const translatedLines = await Promise.all(
+        enLines.map(async (line) => {
+          const res = await fetch(
+            `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=pt&dt=t&q=${encodeURIComponent(
+              line
+            )}`
+          );
+          const data = await res.json();
+          const joined = Array.isArray(data?.[0])
+            ? data[0].map((part) => part?.[0] || '').join('')
+            : '';
+          return joined.trim() || line;
+        })
+      );
+      setNewPortugueseRaw(translatedLines.join('\n'));
+      setIsTranslatingAI(false);
+      return;
+    } catch {
       setIsTranslatingAI(false);
     }
 
@@ -510,13 +556,8 @@ export default function InteractiveReader({
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-semibold uppercase tracking-wider text-indigo-400 flex items-center gap-1.5">
               <Sparkles className="w-4 h-4" />
-              Inspetor de Blocos & Expressões
+              Tradução da Palavra Tocada
             </span>
-            {selectedWordInfo && (
-              <span className="text-[11px] px-2 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                {selectedWordInfo.partOfSpeech}
-              </span>
-            )}
           </div>
 
           {selectedWordInfo ? (
@@ -815,16 +856,24 @@ export default function InteractiveReader({
                         {tokens.map((token, tIdx) => {
                           const clean = token
                             .toLowerCase()
-                            .replace(/[^a-z']/g, '');
+                            .replace(/’/g, "'")
+                            .replace(/[^a-z'-]/g, '')
+                            .replace(/^-+|-+$/g, '');
+                          const stripped = clean.replace(/[^a-z']/g, '');
                           const isHighlighted = Boolean(
-                            activeText.vocabulary?.[clean]
+                            activeText.vocabulary?.[clean] ||
+                              activeText.vocabulary?.[stripped]
                           );
+                          const selectedTokens = selectedWordInfo
+                            ? selectedWordInfo.word
+                                .toLowerCase()
+                                .replace(/’/g, "'")
+                                .split(/\s+/)
+                            : [];
                           const isSelectedWord =
-                            selectedWordInfo &&
-                            clean &&
-                            selectedWordInfo.word
-                              .toLowerCase()
-                              .includes(clean);
+                            Boolean(clean) &&
+                            (selectedTokens.includes(clean) ||
+                              selectedTokens.includes(stripped));
 
                           const shadowWordStatus =
                             shadowEval?.wordAnalysis?.[tIdx]?.status;
